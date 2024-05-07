@@ -219,7 +219,7 @@ while 1
 
         xyP(:, 2:3) = XProfiles{ii};
         cAxis = (Tgt(ii,3):Tgt(ii,4))';
-        cAxis(cAxis == 0) = [];
+        cAxis(cAxis <= 0) = [];
         xyP(:, 1) = cAxis';
 
         if xyP(1, 2) == 0
