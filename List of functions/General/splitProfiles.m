@@ -14,7 +14,9 @@ while 1
     IdE = find(IdNan(IdS:end), 1, 'first');
     if isempty(IdE)
         IdE = size(XY, 1);
-        splitedProfiles{nbSplit} = XY(IdS:IdE, :);
+        if IdE - IdS > minsize
+            splitedProfiles{nbSplit} = XY(IdS:IdE, :);
+        end
         break
 
     else
