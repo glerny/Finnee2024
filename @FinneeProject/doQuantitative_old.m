@@ -4,7 +4,7 @@ function [obj, myMrgPeakList] = doQuantitative(obj, Tag2Fin, Id2PeakList, replac
 if isempty(options)
 
     options.ForROIs.SigMZ         = 4;
-    options.ForROIs.SigTm         = 20;
+    options.ForROIs.SigTm         = 7;
     options.ForROIs.TgtDataset    = 'Dataset2';
     options.ForROIs.IdDataset     = 2;
     options.ForROIs.Folder        = 'ROI4Quant';
@@ -15,18 +15,17 @@ if isempty(options)
     options.Analysis.WindowTime   = 2;
     options.Analysis.WindowMZ     = 2;
     options.Analysis.sgfd         = 'average';
-    options.Analysis.critRes      = 0.6;
+    options.Analysis.critRes      = 1.2;
     options.Analysis.DynRange     = 0.05;
     
-    options.Merge.maxPPM          = 10;
-    options.Merge.maxTm           = 0.02;
+    options.Merge.maxPPM          = 5;
+    options.Merge.maxTm           = 0.05;
     options.Merge.maxRs           = 10;
     options.Merge.S2N             = [3, 3];
     options.Merge.n2n             = [0.9, 0.75];
-    options.Merge.minRepl         = [10, 8];
-    options.Merge.MahalThr        = 3;
+    options.Merge.minRepl         = [25, 20];
+    options.Merge.MahalThr        = 5;
     options.Merge.LocMaxThre      = max(0.15*options.Merge.minRepl(1)*0.25, 0.5);
-    options.Merge.MahalThres      = 7;
 
     options.Doublons.CritRes      = [1.0, 0.5];
 
@@ -208,60 +207,47 @@ for ii = 1:numel(target.ID)
     end
 
     %% CLUSTER DATA
-    Nodes = {}; 
-    StdMz = std(AN.Accu_mass);
-    StdTm = std(AN.chrom_apex);
-    nLoop = 1;
+    Nodes = {}; SNodes = [];
+    StdMz = mean(mySummary.Std_MS_AccuMass1./mySummary.Mean_MS_AccuMass1*1000000);
+    StdTm =  mean(mySummary.Std_Chrom_PeakMaxima);
+    countMe = 1;
+    Xedges = min(AN.chrom_apex)-StdTm:StdTm/2:max(AN.chrom_apex)+StdTm;
+    % Yedges = min(AN.Accu_mass)-StdMz:StdMz/2:max(AN.Accu_mass)+StdMz;
+    Yedges = min(AN.Accu_mass)-StdMz*min(AN.Accu_mass)/1000000;
+    while Yedges(end) < max(AN.Accu_mass) + StdMz*max(AN.Accu_mass)/1000000
+        Yedges(end+1) = Yedges(end) + StdMz/2*Yedges(end)/1000000;
 
-    while 1
-        stepIn = false;
-        Xedges = min(AN.chrom_apex)-StdTm:StdTm/2:max(AN.chrom_apex)+StdTm;
-        Yedges = min(AN.Accu_mass)-StdMz:StdMz/2:max(AN.Accu_mass)+StdMz;
+    end
 
-        N = histcounts2(AN.chrom_apex, AN.Accu_mass, Xedges, Yedges);
-        h = sgsdf_2d(-2:2, -2:2, 2, 2, 0);
-        Data = filter2(h, N, 'same');
-        Data(Data < 0) = 0;
-        Nodes = {};
+    N = histcounts2(AN.chrom_apex, AN.Accu_mass, Xedges, Yedges);
+    h = sgsdf_2d(-2:2, -2:2, 2, 2, 0);
+    Data = filter2(h, N, 'same');
+    Data(Data < 0) = 0;
+    Nodes = {};
 
-        LocMax = [];
-        for jj = 2:size(Data, 1)-1
-            for kk = 2:size(Data, 2)-1
-                Int = [max(1, jj-2) min(jj+2, size(Data, 1)) ...
-                    max(1, kk-2) min(kk+2, size(Data, 2))];
-                if Data(jj, kk) == max(Data(Int(1):Int(2), Int(3):Int(4)), [], 'all', 'omitnan')
-                    LocMax(end+1, :) = [Data(jj, kk), jj, kk];
+    LocMax = [];
+    for jj = 2:size(Data, 1)-1
+        for kk = 2:size(Data, 2)-1
+            Int = [max(1, jj-2) min(jj+2, size(Data, 1)) ...
+                max(1, kk-2) min(kk+2, size(Data, 2))];
+            if Data(jj, kk) == max(Data(Int(1):Int(2), Int(3):Int(4)), [], 'all', 'omitnan')
+                LocMax(end+1, :) = [Data(jj, kk), jj, kk];
 
-                end
             end
         end
-        LocMax(LocMax(:,1) <  options.Merge.LocMaxThre, :) = [];
+    end
+    LocMax(LocMax(:,1) <  options.Merge.LocMaxThre, :) = [];
+    XY = [AN.chrom_apex, AN.Accu_mass];
 
-        if height(LocMax) == 0
-            Nodes{end + 1} = AN(IdGmd == jj, :);
-            break
-        end
+    if height(LocMax) <= 1 | numel(AN.Id2Tgt) - numel(unique(AN.Id2Tgt)) <= round(0.01*numel(unique(AN.Id2Tgt)))
+        Nodes{end + 1} = AN;
 
-        XY = [AN.chrom_apex, AN.Accu_mass];
+    else
         IdGmd = kmeans(XY, height(LocMax), 'Start', [Xedges(LocMax(:, 2))' Yedges(LocMax(:, 3))']);
 
         for jj = 1:max(IdGmd)
-            if numel(AN.Id2Tgt(IdGmd == jj)) - numel(unique(AN.Id2Tgt(IdGmd == jj))) > max(round(0.05*numel(unique(AN.Id2Tgt(IdGmd == jj)))), 1) & nLoop <= 5
-                stepIn = true;
-                nLoop = nLoop + 1;
-                break
-
-            else
-                Nodes{end + 1} = AN(IdGmd == jj, :);
-            end
-        end
-
-        if stepIn
-            StdMz = StdMz/2;
-            StdTm = StdTm/2;
-        
-        else
-            break
+            Nodes{end + 1} = AN(IdGmd == jj, :);
+            % TXY(ii, :) = [mean(AN.chrom_centroid(IdGmd == jj))];
 
         end
 
@@ -278,8 +264,8 @@ for ii = 1:numel(target.ID)
 
         XY = [fPeaks.chrom_apex, fPeaks.Accu_mass];
         gmd = gmdistribution(mean(XY), cov(XY));
-        fPeaks(mahal(gmd, XY) > options.Merge.MahalThres, :) = [];
-        XY = [fPeaks.chrom_apex, fPeaks.Accu_mass];
+        %fPeaks(mahal(gmd, [fPeaks.chrom_apex, fPeaks.Accu_mass]) > options.Merge.MahalThr, :)  = [];
+         XY = [fPeaks.chrom_apex, fPeaks.Accu_mass];
         gmd = gmdistribution(mean(XY), cov(XY));
 
         ListDoublons = find(histcounts(fPeaks.Id2Tgt, 1:max(fPeaks.Id2Tgt)+1) > 1);
@@ -304,6 +290,12 @@ for ii = 1:numel(target.ID)
                 mean(fPeaks.Accu_mass), std(fPeaks.Accu_mass), ...
                 mean(fPeaks.ms_variance), std(fPeaks.ms_variance)];
             countMe = countMe+1;
+
+        end
+
+        if numel(unique(fPeaks.Id2Tgt)) ~= numel(fPeaks.Id2Tgt)
+            disp("pp")
+
         end
     end
 
@@ -314,10 +306,6 @@ for ii = 1:numel(target.ID)
             ((SNodes(:, 10)-target.Targetmz(ii))./SNodes(:, 11)).^2+...
             ((SNodes(:, 4)-target.TargetTime(ii))./SNodes(:, 5)).^2);
         cAN = NNodes{idX};
-
-        if numel(cAN.Id2Tgt) ~= numel(unique(cAN.Id2Tgt))
-            disp("pp")
-        end
 
         if height(cAN) > options.Merge.minRepl(1)
             V = (1:numel(obj.ListOfFiles))';
@@ -343,21 +331,16 @@ for ii = 1:numel(target.ID)
             Summary.MS_Assym(end+1, 1) = mean(cAN.ms_assym, 'omitnan');
             Summary.n(end+1, 1) = height(cAN);
         end
+
+
     end
 end
 Summary = struct2table(Summary);
 
-%% PROVISORY
-assignin('base', 'target', target)
-assignin('base', 'options', options)
-assignin('base', 'Features', Features)
-assignin('base', 'Area', Area)
-assignin('base', 'Summary', Summary)
-
 %% CHECK FOR DOUBLONS
 while 1
     doStop = true;
-    StdROIs = [Summary.mean_Apex Summary.Std_Apex  Summary.mean_Accu Summary.Std_Accu];
+    StdROIs = [Summary.mean_ctr Summary.Std_ctr Summary.mean_Accu Summary.Std_Accu];
 
     for ii = 1:height(StdROIs)
         RS = abs((StdROIs(:, 1) - StdROIs(ii, 1))./(2*((StdROIs(:, 2) + StdROIs(ii, 2)))));
@@ -368,7 +351,7 @@ while 1
         if numel(IdDoublons) > 1
 
             TAN = []; NAN = [];
-            [val, IdFeature] = intersect(Features.ID, Summary.ID(IdDoublons));
+            [val, IdFeature]=intersect(Features.ID, Summary.ID(IdDoublons));
 
             if numel(val) ~= numel(IdDoublons)
                 error("line 339");
@@ -404,97 +387,90 @@ while 1
                 NAN = [NAN; sAN];
             end
 
-            StdMz = std(NAN.Accu_mass);
-            StdTm =  std(NAN.chrom_apex);
-            nLoop = 1;
+            StdMz = std(NAN.Accu_mass); % mean(mySummary.Std_MS_AccuMass1./mySummary.Mean_MS_AccuMass1*1000000);
+            StdTm =  std(NAN.chrom_apex); %% mean(mySummary.Std_Chrom_PeakMaxima);
+            Xedges = min(NAN.chrom_apex)-StdTm:StdTm/2:max(NAN.chrom_apex)+StdTm;
+            Yedges = min(NAN.Accu_mass)-StdMz:StdMz/2:max(NAN.Accu_mass)+StdMz;
+            %     while Yedges(end) < max(AN.Accu_mass) + StdMz*max(AN.Accu_mass)/1000000
+            %         Yedges(end+1) = Yedges(end) + StdMz/2*Yedges(end)/1000000;
+            %
+%     end
 
-            while 1
-                stepIn = false;
-                Xedges = min(NAN.chrom_apex)-StdTm:StdTm/2:max(NAN.chrom_apex)+StdTm;
-                Yedges = min(NAN.Accu_mass)-StdMz:StdMz/2:max(NAN.Accu_mass)+StdMz;
+%             Xedges = min(NAN.chrom_apex)-StdTm:StdTm/2:max(NAN.chrom_apex)+StdTm;
+%             Yedges = min(NAN.Accu_mass)-StdMz*min(NAN.Accu_mass)/1000000;
+%             while Yedges(end) < max(NAN.Accu_mass) + StdMz*max(NAN.Accu_mass)/1000000
+%                 Yedges(end+1) = Yedges(end) + StdMz/2*Yedges(end)/1000000;
+% 
+%             end
+            N = histcounts2(NAN.chrom_apex, NAN.Accu_mass, Xedges, Yedges);
+            h = sgsdf_2d(-2:2, -2:2, 2, 2, 0);
+            Data = filter2(h, N, 'same');
+            Data(Data < 0) = 0;
 
-                N = histcounts2(NAN.chrom_apex, NAN.Accu_mass, Xedges, Yedges);
-                h = sgsdf_2d(-2:2, -2:2, 2, 2, 0);
-                Data = filter2(h, N, 'same');
-                Data(Data < 0) = 0;
-                NNodes = {};
+            LocMax = [];
+            for jj = 2:size(Data, 1)-1
+                for kk = 2:size(Data, 2)-1
+                    Int = [max(1, jj-2) min(jj+2, size(Data, 1)) ...
+                        max(1, kk-2) min(kk+2, size(Data, 2))];
+                    if Data(jj, kk) == max(Data(Int(1):Int(2), Int(3):Int(4)), [], 'all', 'omitnan')
+                        LocMax(end+1, :) = [Data(jj, kk), jj, kk];
 
-                LocMax = [];
-                for jj = 2:size(Data, 1)-1
-                    for kk = 2:size(Data, 2)-1
-                        Int = [max(1, jj-2) min(jj+2, size(Data, 1)) ...
-                            max(1, kk-2) min(kk+2, size(Data, 2))];
-                        if Data(jj, kk) == max(Data(Int(1):Int(2), Int(3):Int(4)), [], 'all', 'omitnan')
-                            LocMax(end+1, :) = [Data(jj, kk), jj, kk];
-
-                        end
                     end
                 end
-                LocMax(LocMax(:,1) <  options.Merge.LocMaxThre, :) = [];
+            end
+            LocMax(LocMax(:,1) <  options.Merge.LocMaxThre, :) = [];
 
-                if height(LocMax) == 0
-                    NNodes{end + 1} = NAN(IdGmd == jj, :);
-                    break
-                end
+            XY = [NAN.chrom_apex, NAN.Accu_mass];
+            sNodes = {};
 
-                XY = [NAN.chrom_apex, NAN.Accu_mass];
+            if height(LocMax) <= 1 | numel(NAN.Id2Tgt) - numel(unique(NAN.Id2Tgt)) <= round(0.01*numel(unique(NAN.Id2Tgt)))
+                sNodes{end + 1} = NAN;
+
+            else
                 IdGmd = kmeans(XY, height(LocMax), 'Start', [Xedges(LocMax(:, 2))' Yedges(LocMax(:, 3))']);
+                % gmd = fitgmdist(XY, height(LocMax), 'CovarianceType','diagonal','SharedCovariance', true, 'Start', IdGmd);
+                % IdGmd = gmd.cluster(XY);
 
                 for jj = 1:max(IdGmd)
-                    if numel(NAN.Id2Tgt(IdGmd == jj)) - numel(unique(NAN.Id2Tgt(IdGmd == jj))) > max(round(0.05*numel(unique(NAN.Id2Tgt(IdGmd == jj)))), 1) & nLoop <= 5
-                        stepIn = true;
-                        nLoop = nLoop + 1;
-                        break
+                    pAN = NAN(IdGmd == jj, :);
+                    pAN(mahal(gmd, [pAN.chrom_apex, pAN.Accu_mass]) > options.Merge.MahalThr, :)  = [];
 
-                    else
-                        NNodes{end + 1} = NAN(IdGmd == jj, :);
+                    if height(pAN) > options.Merge.minRepl(1)
+
+                        XY = [pAN.chrom_apex, pAN.Accu_mass];
+                        gmd = gmdistribution(mean(XY), cov(XY));
+                        ListDoublons = find(histcounts(pAN.Id2Tgt, 1:max(pAN.Id2Tgt)+1) > 1);
+                        Id2Del = [];
+
+                        for kk = 1:numel(ListDoublons)
+                            IdD = find(pAN.Id2Tgt == ListDoublons(kk));
+                            mahald2 = mahal(gmd, [pAN.chrom_apex(IdD), pAN.Accu_mass(IdD)]);
+                            [~, IdM] = min(mahald2);
+                            IdD(IdM) = [];
+                            Id2Del = [Id2Del; IdD];
+
+                        end
+                        pAN(Id2Del, :) = [];
+                        sNodes{end + 1} = pAN;
+                       
                     end
                 end
-
-                if stepIn
-                    StdMz = StdMz/2;
-                    StdTm = StdTm/2;
-
-                else
-                    break
-
-                end
-
             end
 
             ToKtoD = IdDoublons;
             sTarget = target(Summary.ID(IdDoublons), :);
             ToKtoD(:, 2) = NaN;
             ToKtoD(:, 3) = Summary.ID(IdDoublons);
-            for jj = 1:numel(NNodes)
-                pAN = NNodes{jj};
 
-                if height(pAN) <= options.Merge.minRepl(1), continue; end
-
-                XY = [pAN.chrom_apex, pAN.Accu_mass];
-                gmd = gmdistribution(mean(XY), cov(XY));
-                pAN(mahal(gmd, XY) > options.Merge.MahalThres, :) = [];
-                XY = [pAN.chrom_apex, pAN.Accu_mass];
-                gmd = gmdistribution(mean(XY), cov(XY));
-
-                LD = find(histcounts(pAN.Id2Tgt, 1:max(pAN.Id2Tgt)+1) > 1);
-                ID = [];
-                for kk = 1:numel(LD)
-                    IdD = find(pAN.Id2Tgt == LD(kk));
-                    mahald2 = mahal(gmd, [pAN.chrom_apex(IdD), pAN.Accu_mass(IdD)]);
-                    [~, IdM] = min(mahald2);
-                    IdD(IdM) = [];
-                    ID = [ID; IdD];
-
-                end
-                pAN(ID, :) = [];
+            for jj = 1:numel(sNodes)
+                pAN = sNodes{jj};
 
                 if height(pAN) > options.Merge.minRepl(1)
                     [~, IdT] = min(((mean(pAN.chrom_apex)-sTarget.TargetTime)/std(pAN.chrom_apex)).^2+((mean(pAN.Accu_mass)-sTarget.Targetmz)/std(pAN.Accu_mass)).^2);
 
                     if isnan(ToKtoD(IdT, 2))
                         IdTgt = ToKtoD(IdT, 1);
-                        V = (1:sum(strcmp(obj.Summary.FinneeType, Tag2Fin)))';
+                        V = (1:numel(obj.ListOfFiles))';
                         [~, ia, ib] = intersect(V, pAN.Id2Tgt);
                         V(ia, 2:4) = [pAN.chrom_area(ib), pAN.chrom_centroid(ib), pAN.Accu_mass(ib)];
                         Area.Values(Area.ID ==  Summary.ID(IdTgt), :) = V(:, 2)';
@@ -515,11 +491,11 @@ while 1
                         Summary.MS_Assym(IdTgt) = mean(pAN.ms_assym, 'omitnan');
                         Summary.n(IdTgt) = height(pAN);
                         ToKtoD(IdT, 2) = 1;
-
+                    
                     else
                         IdTgt = ToKtoD(IdT, 1);
                         if Summary.n(IdTgt) < height(pAN)
-                           V = (1:sum(strcmp(obj.Summary.FinneeType, Tag2Fin)))';
+                            V = (1:numel(obj.ListOfFiles))';
                             [~, ia, ib] = intersect(V, pAN.Id2Tgt);
                             V(ia, 2:4) = [pAN.chrom_area(ib), pAN.chrom_centroid(ib), pAN.Accu_mass(ib)];
                             Area.Values(Area.ID ==  Summary.ID(IdTgt), :) = V(:, 2)';
@@ -560,6 +536,8 @@ while 1
 
     if doStop, break; end
 end
+
+
 
 if ~isfield(myMrgPeakList, 'TargetedAnalysis')
     myMrgPeakList.TargetedAnalysis = {};

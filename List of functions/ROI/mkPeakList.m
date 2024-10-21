@@ -18,10 +18,10 @@ if isempty(options)
             options.Analysis1.minTime         = 5;
             options.Analysis1.WindowMZ        = 2;
             options.Analysis1.WindowTime      = 2;
-            options.Analysis1.Min_nnz         = 6;
+            options.Analysis1.Min_nnz         = 10;
             options.Analysis1.sgfd            = 'average';
             options.Analysis1.StepSize        = 1.1;
-            options.Analysis1.CritRes         = 1;
+            options.Analysis1.CritRes         = 0.8;
 
     end
 end

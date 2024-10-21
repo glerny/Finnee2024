@@ -20,17 +20,17 @@ if nargin == 2
     options.method.min_MZ_Len       = 5; % min_MZ_peak_Length    
     options.method.min_Chrom_Len    = 7; % min_Chrom_peak_Length
     options.method.sgfd             = 'medium';
-    options.method.WindowMZ         = 2;
-    options.method.WindowTime       = 3;
+    options.method.WindowMZ         = 3;
+    options.method.WindowTime       = 4;
     options.method.min_Sig2minNoise = 3;
     options.method.maxSize          = [3000 5000];
     options.method.myThreshs        = [0, 0.5, 1, 10];
 
 
 
-    options.filterROIs.do           = true;
+    options.filterROIs.do           = false;
     options.filterROIs.method       = 'Random Forest';
-    options.filterROIs.minPerLabel  = 75;
+    options.filterROIs.minPerLabel  = 50;
     options.filterROIs.LabelData    = [];
     options.filterROIs.model        = {};
     options.filterROIs.FilteredData = [];
@@ -217,6 +217,7 @@ while 1
         % 1.2 Profile
         xyP = [];
 
+       
         xyP(:, 2:3) = XProfiles{ii};
         cAxis = (Tgt(ii,3):Tgt(ii,4))';
         cAxis(cAxis <= 0) = [];

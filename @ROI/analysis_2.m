@@ -17,7 +17,6 @@ if nargin == 1
     Options.sgfd         = 'average';
     Options.critRes      = 1;
     Options.DynRange     = 0.05;
-    Options.Orders       = 1; 
 
 end
 myTarget = obj.AditionalInformation.target;
@@ -99,11 +98,12 @@ Itgt = ...
     [find(Y_new == myTarget.Targetmz - Options.sigMZ*myTarget.PeakStdDev_MS), ...
     find(Y_new == myTarget.Targetmz + Options.sigMZ*myTarget.PeakStdDev_MS)];
 XYChr = [obj.AxisX.Data, (trapz(Y_new(Itgt(1):Itgt(2)), XYZ(Itgt(1):Itgt(2), :)))'];
+XYChr = [obj.AxisX.Data, (trapz(Y_new(1:end), XYZ(1:end, :)))'];
 XYChr(isnan(XYChr)) = 0;
 
 %% Baseline correction
 if all(XYChr(:, 2) ~= 0)
-    [z, w] = doPF(XYChr, Options.Orders);
+    [z, w] = doPF_HRMS(XYChr, 4, 1); % doPF(XYChr, Options.Orders);
     Noise = mean(XYChr(w, 2)) + 1*std(XYChr(w, 2));
     XYChr(:, 2) = XYChr(:, 2) - z;
     XYChr(XYChr(:, 2) < 0, 2) = 0;
@@ -251,7 +251,7 @@ for ii = 1:size(PEAKS, 1)
     ChromPeak(ii, :) = {PEAKS(ii, 5), PEAKS(ii, 6), PEAKS(ii, 7), PEAKS(ii, 8), ...
         PEAKS(ii, 9),  (PEAKS(ii, 8) - PEAKS(ii, 5))/ PEAKS(ii, 8), ...
         PEAKS(ii, 3),  PEAKS(ii, 4) , ...
-        MMS(2), MMS(3), (MMS(2) - lmMS(1))/MMS(2),...
+        lmMS(1), MMS(3), (MMS(2) - lmMS(1))/MMS(2),...
         MassSpectra{ii}(IdMS_start, 1), MassSpectra{ii}(IdMS_end, 1), ...
         Sig, Noise, n2n};
 end

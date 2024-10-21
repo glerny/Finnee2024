@@ -1,4 +1,4 @@
-function [obj, myMrgPeakList] = doQuantitative(obj, Tag2Fin, Id2PeakList, replace, timeAlign, options)
+function [obj, myMrgPeakList] = doQuantitative_small(obj, Tag2Fin, Id2PeakList, replace, timeAlign, options)
 
 %% INTRODUCTION
 if isempty(options)
@@ -24,11 +24,8 @@ if isempty(options)
     options.Merge.S2N             = [3, 3];
     options.Merge.n2n             = [0.9, 0.75];
     options.Merge.minRepl         = [10, 8];
-    options.Merge.MahalThr        = 3;
-    options.Merge.LocMaxThre      = max(0.15*options.Merge.minRepl(1)*0.25, 0.5);
-    options.Merge.MahalThres      = 7;
-
-    options.Doublons.CritRes      = [1.0, 0.5];
+    options.Merge.MahalThres      = 3;
+    options.Doublons.CritRes      = [1, 0.5];
 
 end
 
@@ -127,7 +124,7 @@ if ~isempty(IdFile)
         myTgtFolder = fullfile(myMapFiles.TgtFolder{ii}, options.ForROIs.Folder);
 
         CFN.mkMnROI(options.ForROIs.IdDataset, corTarget, [0 0 0], myTgtFolder);
-        disp([obj.Summary.FileID{ii}, ' done!'])
+        disp([myMapFiles.FinneeFile{ii}, ' done!'])
 
     end
 end
@@ -212,138 +209,53 @@ for ii = 1:numel(target.ID)
     StdMz = std(AN.Accu_mass);
     StdTm = std(AN.chrom_apex);
     nLoop = 1;
+    cAN = table();
 
-    while 1
-        stepIn = false;
-        Xedges = min(AN.chrom_apex)-StdTm:StdTm/2:max(AN.chrom_apex)+StdTm;
-        Yedges = min(AN.Accu_mass)-StdMz:StdMz/2:max(AN.Accu_mass)+StdMz;
+    OutputList = MyRecursive(AN, options.Merge.maxPPM, options.Merge.maxTm, options.Merge.minRepl(1), {});
+    if isempty(OutputList), continue; end
 
-        N = histcounts2(AN.chrom_apex, AN.Accu_mass, Xedges, Yedges);
-        h = sgsdf_2d(-2:2, -2:2, 2, 2, 0);
-        Data = filter2(h, N, 'same');
-        Data(Data < 0) = 0;
-        Nodes = {};
+    TestMe = (1:numel(OutputList))';
 
-        LocMax = [];
-        for jj = 2:size(Data, 1)-1
-            for kk = 2:size(Data, 2)-1
-                Int = [max(1, jj-2) min(jj+2, size(Data, 1)) ...
-                    max(1, kk-2) min(kk+2, size(Data, 2))];
-                if Data(jj, kk) == max(Data(Int(1):Int(2), Int(3):Int(4)), [], 'all', 'omitnan')
-                    LocMax(end+1, :) = [Data(jj, kk), jj, kk];
+    for jj = 1:numel(OutputList)
+        TestMe(jj, 2) = (mean(OutputList{jj}.Accu_mass)- target.Targetmz(ii)).^2 +...
+            (mean(OutputList{jj}.chrom_apex - target.TargetTime(ii))).^2;
 
-                end
-            end
-        end
-        LocMax(LocMax(:,1) <  options.Merge.LocMaxThre, :) = [];
+    end
+    [~, Idmin] = min(TestMe(:, 2));
+    cAN = OutputList{Idmin};
 
-        if height(LocMax) == 0
-            Nodes{end + 1} = AN(IdGmd == jj, :);
-            break
-        end
-
-        XY = [AN.chrom_apex, AN.Accu_mass];
-        IdGmd = kmeans(XY, height(LocMax), 'Start', [Xedges(LocMax(:, 2))' Yedges(LocMax(:, 3))']);
-
-        for jj = 1:max(IdGmd)
-            if numel(AN.Id2Tgt(IdGmd == jj)) - numel(unique(AN.Id2Tgt(IdGmd == jj))) > max(round(0.05*numel(unique(AN.Id2Tgt(IdGmd == jj)))), 1) & nLoop <= 5
-                stepIn = true;
-                nLoop = nLoop + 1;
-                break
-
-            else
-                Nodes{end + 1} = AN(IdGmd == jj, :);
-            end
-        end
-
-        if stepIn
-            StdMz = StdMz/2;
-            StdTm = StdTm/2;
-        
-        else
-            break
-
-        end
+    while numel(cAN.Id2Tgt) ~= numel(unique(cAN.Id2Tgt))
+        [~, id] = max(((cAN.Accu_mass - target.Targetmz(ii))/std(cAN.Accu_mass)).^2 +...
+            ((cAN.chrom_apex - target.TargetTime(ii))/std(cAN.chrom_apex)).^2);
+        cAN(id, :) = [];
 
     end
 
-    NNodes = {};
-    SNodes = [];
-    countMe = 1;
-
-    for jj = 1:numel(Nodes)
-        fPeaks = Nodes{jj};
-
-        if height(fPeaks) < options.Merge.minRepl(1), continue; end
-
-        XY = [fPeaks.chrom_apex, fPeaks.Accu_mass];
-        gmd = gmdistribution(mean(XY), cov(XY));
-        fPeaks(mahal(gmd, XY) > options.Merge.MahalThres, :) = [];
-        XY = [fPeaks.chrom_apex, fPeaks.Accu_mass];
-        gmd = gmdistribution(mean(XY), cov(XY));
-
-        ListDoublons = find(histcounts(fPeaks.Id2Tgt, 1:max(fPeaks.Id2Tgt)+1) > 1);
-        Id2Del = [];
-        for kk = 1:numel(ListDoublons)
-            IdD = find(fPeaks.Id2Tgt == ListDoublons(kk));
-            mahald2 = mahal(gmd, [fPeaks.chrom_apex(IdD), fPeaks.Accu_mass(IdD)]);
-            [~, IdM] = min(mahald2);
-            IdD(IdM) = [];
-            Id2Del = [Id2Del; IdD];
-
-        end
-        fPeaks(Id2Del, :) = [];
-
-        if height(fPeaks) > options.Merge.minRepl(1)
-
-            NNodes{countMe} = fPeaks;
-            SNodes(countMe, :) = [countMe, size(fPeaks, 1), mean(fPeaks.chrom_area), ...
-                mean(fPeaks.chrom_apex), std(fPeaks.chrom_apex),...
-                mean(fPeaks.chrom_centroid), std(fPeaks.chrom_centroid),...
-                mean(fPeaks.chrom_variance), std(fPeaks.chrom_variance), ...
-                mean(fPeaks.Accu_mass), std(fPeaks.Accu_mass), ...
-                mean(fPeaks.ms_variance), std(fPeaks.ms_variance)];
-            countMe = countMe+1;
-        end
+    if height(cAN) >= options.Merge.minRepl(1)
+        V = (1:sum(strcmp(obj.Summary.FinneeType, Tag2Fin)))';
+        [~, ia, ib] = intersect(V, cAN.Id2Tgt);
+        V(ia, 2:4) = [cAN.chrom_area(ib), cAN.chrom_centroid(ib), cAN.Accu_mass(ib)];
+        IdROI = target.ID(ii);
+        Area.Values(Area.ID == IdROI, :) = V(:, 2)';
+        Features.Values{Features.ID == IdROI} = cAN;
+        Summary.ID(end+1, 1) = IdROI;
+        Summary.mean_IApex(end+1, 1) = mean(cAN.chrom_intensity_apex, 'omitnan');
+        Summary.Std_IApex(end+1, 1)  = std(cAN.chrom_intensity_apex, [], 'omitnan');
+        Summary.mean_Apex(end+1, 1) = mean(cAN.chrom_apex, 'omitnan');
+        Summary.Std_Apex(end+1, 1)  = std(cAN.chrom_apex, [], 'omitnan');
+        Summary.mean_ctr(end+1, 1) = mean(cAN.chrom_centroid, 'omitnan');
+        Summary.Std_ctr(end+1, 1) = std(cAN.chrom_centroid, [], 'omitnan');
+        Summary.mean_ChrV(end+1, 1) = mean(cAN.chrom_variance, 'omitnan');
+        Summary.Std_ChrV(end+1, 1) = std(cAN.chrom_variance, [], 'omitnan');
+        Summary.chr_Assym(end+1, 1) = mean(cAN.chrom_assym, 'omitnan');
+        Summary.mean_Accu(end+1, 1) =  mean(cAN.Accu_mass, 'omitnan');
+        Summary.Std_Accu(end+1, 1) =  std(cAN.Accu_mass, [], 'omitnan');
+        Summary.mean_MZV(end+1, 1) =  mean(cAN.ms_variance, 'omitnan');
+        Summary.Std_MZV(end+1, 1) = std(cAN.ms_variance, [], 'omitnan');
+        Summary.MS_Assym(end+1, 1) = mean(cAN.ms_assym, 'omitnan');
+        Summary.n(end+1, 1) = height(cAN);
     end
 
-    % END CLUSTER
-
-    if ~isempty(SNodes)
-        [~, idX] = min(...
-            ((SNodes(:, 10)-target.Targetmz(ii))./SNodes(:, 11)).^2+...
-            ((SNodes(:, 4)-target.TargetTime(ii))./SNodes(:, 5)).^2);
-        cAN = NNodes{idX};
-
-        if numel(cAN.Id2Tgt) ~= numel(unique(cAN.Id2Tgt))
-            disp("pp")
-        end
-
-        if height(cAN) > options.Merge.minRepl(1)
-            V = (1:numel(obj.ListOfFiles))';
-            [~, ia, ib] = intersect(V, cAN.Id2Tgt);
-            V(ia, 2:4) = [cAN.chrom_area(ib), cAN.chrom_centroid(ib), cAN.Accu_mass(ib)];
-            IdROI = target.ID(ii);
-            Area.Values(Area.ID == IdROI, :) = V(:, 2)';
-            Features.Values{Features.ID == IdROI} = cAN;
-            Summary.ID(end+1, 1) = IdROI;
-            Summary.mean_IApex(end+1, 1) = mean(cAN.chrom_intensity_apex, 'omitnan');
-            Summary.Std_IApex(end+1, 1)  = std(cAN.chrom_intensity_apex, [], 'omitnan');
-            Summary.mean_Apex(end+1, 1) = mean(cAN.chrom_apex, 'omitnan');
-            Summary.Std_Apex(end+1, 1)  = std(cAN.chrom_apex, [], 'omitnan');
-            Summary.mean_ctr(end+1, 1) = mean(cAN.chrom_centroid, 'omitnan');
-            Summary.Std_ctr(end+1, 1) = std(cAN.chrom_centroid, [], 'omitnan');
-            Summary.mean_ChrV(end+1, 1) = mean(cAN.chrom_variance, 'omitnan');
-            Summary.Std_ChrV(end+1, 1) = std(cAN.chrom_variance, [], 'omitnan');
-            Summary.chr_Assym(end+1, 1) = mean(cAN.chrom_assym, 'omitnan');
-            Summary.mean_Accu(end+1, 1) =  mean(cAN.Accu_mass, 'omitnan');
-            Summary.Std_Accu(end+1, 1) =  std(cAN.Accu_mass, [], 'omitnan');
-            Summary.mean_MZV(end+1, 1) =  mean(cAN.ms_variance, 'omitnan');
-            Summary.Std_MZV(end+1, 1) = std(cAN.ms_variance, [], 'omitnan');
-            Summary.MS_Assym(end+1, 1) = mean(cAN.ms_assym, 'omitnan');
-            Summary.n(end+1, 1) = height(cAN);
-        end
-    end
 end
 Summary = struct2table(Summary);
 
@@ -354,10 +266,127 @@ assignin('base', 'Features', Features)
 assignin('base', 'Area', Area)
 assignin('base', 'Summary', Summary)
 
+Summary.NotDone = true(height(Summary), 1);
+while 1
+
+    myOutliers = isoutlier(Summary.Std_Accu./Summary.mean_Accu);
+    [~, IdFeature] = intersect(Features.ID, Summary.ID(find(myOutliers & Summary.NotDone)));
+    if isempty(IdFeature), break, end
+
+    for ii = 1:numel(IdFeature)
+        testedFeat = Features.Values{IdFeature(ii)};
+        if height(testedFeat) == 2
+
+            Id2Del = find(Summary.ID == IdFeature(ii));
+            Summary(Id2Del, :) = [];
+            Area.Values(IdFeature(ii), :) = NaN;
+            Features.Values{IdFeature(ii)} = table();
+
+        else
+            XY = [testedFeat.Accu_mass, testedFeat.chrom_intensity_apex];
+            gmd = gmdistribution(mean(XY), cov(XY));
+            testedFeat(mahal(gmd, XY) > options.Merge.MahalThres, :) = [];
+
+            if height(testedFeat) == 2
+
+                Id2Del = find(Summary.ID == IdFeature(ii));
+                Summary(Id2Del, :) = [];
+                Area.Values(IdFeature(ii), :) = NaN;
+                Features.Values{IdFeature(ii)} = table();
+
+            else
+
+                Id2Rpl = find(Summary.ID == IdFeature(ii));
+                V = (1:sum(strcmp(obj.Summary.FinneeType, Tag2Fin)))';
+                [~, ia, ib] = intersect(V, testedFeat.Id2Tgt);
+                V(ia, 2:4) = [testedFeat.chrom_area(ib), testedFeat.chrom_centroid(ib), testedFeat.Accu_mass(ib)];
+                Area.Values(IdFeature(ii), :) = V(:, 2)';
+                Features.Values{IdFeature(ii)} = testedFeat;
+                Summary.mean_IApex(Id2Rpl) = mean(testedFeat.chrom_intensity_apex, 'omitnan');
+                Summary.Std_IApex(Id2Rpl)  = std(testedFeat.chrom_intensity_apex, [], 'omitnan');
+                Summary.mean_Apex(Id2Rpl) = mean(testedFeat.chrom_apex, 'omitnan');
+                Summary.Std_Apex(Id2Rpl)  = std(testedFeat.chrom_apex, [], 'omitnan');
+                Summary.mean_ctr(Id2Rpl) = mean(testedFeat.chrom_centroid, 'omitnan');
+                Summary.Std_ctr(Id2Rpl) = std(testedFeat.chrom_centroid, [], 'omitnan');
+                Summary.mean_ChrV(Id2Rpl) = mean(testedFeat.chrom_variance, 'omitnan');
+                Summary.Std_ChrV(Id2Rpl) = std(testedFeat.chrom_variance, [], 'omitnan');
+                Summary.chr_Assym(Id2Rpl) = mean(testedFeat.chrom_assym, 'omitnan');
+                Summary.mean_Accu(Id2Rpl) =  mean(testedFeat.Accu_mass, 'omitnan');
+                Summary.Std_Accu(Id2Rpl) =  std(testedFeat.Accu_mass, [], 'omitnan');
+                Summary.mean_MZV(Id2Rpl) =  mean(testedFeat.ms_variance, 'omitnan');
+                Summary.Std_MZV(Id2Rpl) = std(testedFeat.ms_variance, [], 'omitnan');
+                Summary.MS_Assym(Id2Rpl) = mean(testedFeat.ms_assym, 'omitnan');
+                Summary.n(Id2Rpl) = height(testedFeat);
+                Summary.NotDone(Id2Rpl) = false;
+            end
+        end
+    end
+end
+
+Summary.NotDone = true(height(Summary), 1);
+while 1
+
+    myOutliers = isoutlier(Summary.Std_Apex);
+    [~, IdFeature] = intersect(Features.ID, Summary.ID(find(myOutliers & Summary.NotDone)));
+    if isempty(IdFeature), break, end
+
+    for ii = 1:numel(IdFeature)
+        testedFeat = Features.Values{IdFeature(ii)};
+        if height(testedFeat) == 2
+
+            Id2Del = find(Summary.ID == IdFeature(ii));
+            Summary(Id2Del, :) = [];
+            Area.Values(IdFeature(ii), :) = NaN;
+            Features.Values{IdFeature(ii)} = table();
+
+        else
+            XY = [testedFeat.Accu_mass, testedFeat.chrom_intensity_apex];
+            gmd = gmdistribution(mean(XY), cov(XY));
+            testedFeat(mahal(gmd, XY) > options.Merge.MahalThres, :) = [];
+
+            if height(testedFeat) == 2
+
+                Id2Del = find(Summary.ID == IdFeature(ii));
+                Summary(Id2Del, :) = [];
+                Area.Values(IdFeature(ii), :) = NaN;
+                Features.Values{IdFeature(ii)} = table();
+
+            else
+
+                Id2Rpl = find(Summary.ID == IdFeature(ii));
+                V = (1:sum(strcmp(obj.Summary.FinneeType, Tag2Fin)))';
+                [~, ia, ib] = intersect(V, testedFeat.Id2Tgt);
+                V(ia, 2:4) = [testedFeat.chrom_area(ib), testedFeat.chrom_centroid(ib), testedFeat.Accu_mass(ib)];
+                Area.Values(IdFeature(ii), :) = V(:, 2)';
+                Features.Values{IdFeature(ii)} = testedFeat;
+                Summary.mean_IApex(Id2Rpl) = mean(testedFeat.chrom_intensity_apex, 'omitnan');
+                Summary.Std_IApex(Id2Rpl)  = std(testedFeat.chrom_intensity_apex, [], 'omitnan');
+                Summary.mean_Apex(Id2Rpl) = mean(testedFeat.chrom_apex, 'omitnan');
+                Summary.Std_Apex(Id2Rpl)  = std(testedFeat.chrom_apex, [], 'omitnan');
+                Summary.mean_ctr(Id2Rpl) = mean(testedFeat.chrom_centroid, 'omitnan');
+                Summary.Std_ctr(Id2Rpl) = std(testedFeat.chrom_centroid, [], 'omitnan');
+                Summary.mean_ChrV(Id2Rpl) = mean(testedFeat.chrom_variance, 'omitnan');
+                Summary.Std_ChrV(Id2Rpl) = std(testedFeat.chrom_variance, [], 'omitnan');
+                Summary.chr_Assym(Id2Rpl) = mean(testedFeat.chrom_assym, 'omitnan');
+                Summary.mean_Accu(Id2Rpl) =  mean(testedFeat.Accu_mass, 'omitnan');
+                Summary.Std_Accu(Id2Rpl) =  std(testedFeat.Accu_mass, [], 'omitnan');
+                Summary.mean_MZV(Id2Rpl) =  mean(testedFeat.ms_variance, 'omitnan');
+                Summary.Std_MZV(Id2Rpl) = std(testedFeat.ms_variance, [], 'omitnan');
+                Summary.MS_Assym(Id2Rpl) = mean(testedFeat.ms_assym, 'omitnan');
+                Summary.n(Id2Rpl) = height(testedFeat);
+                Summary.NotDone(Id2Rpl) = false;
+            end
+        end
+    end
+end
+
+Summary.NotDone = [];
 %% CHECK FOR DOUBLONS
+Summary.toTest = true(height(Summary), 1);
+
 while 1
     doStop = true;
-    StdROIs = [Summary.mean_Apex Summary.Std_Apex  Summary.mean_Accu Summary.Std_Accu];
+    StdROIs = [Summary.mean_Apex Summary.Std_Apex  Summary.mean_Accu Summary.Std_Accu Summary.toTest];
 
     for ii = 1:height(StdROIs)
         RS = abs((StdROIs(:, 1) - StdROIs(ii, 1))./(2*((StdROIs(:, 2) + StdROIs(ii, 2)))));
@@ -365,7 +394,7 @@ while 1
         RS(:, 3) = sqrt(RS(:, 1).^2 + RS(:, 2).^2);
 
         IdDoublons = find(RS(:, 3) < options.Doublons.CritRes(1));
-        if numel(IdDoublons) > 1
+        if numel(IdDoublons) > 1 & all(Summary.toTest(IdDoublons))
 
             TAN = []; NAN = [];
             [val, IdFeature] = intersect(Features.ID, Summary.ID(IdDoublons));
@@ -408,87 +437,44 @@ while 1
             StdTm =  std(NAN.chrom_apex);
             nLoop = 1;
 
-            while 1
-                stepIn = false;
-                Xedges = min(NAN.chrom_apex)-StdTm:StdTm/2:max(NAN.chrom_apex)+StdTm;
-                Yedges = min(NAN.Accu_mass)-StdMz:StdMz/2:max(NAN.Accu_mass)+StdMz;
-
-                N = histcounts2(NAN.chrom_apex, NAN.Accu_mass, Xedges, Yedges);
-                h = sgsdf_2d(-2:2, -2:2, 2, 2, 0);
-                Data = filter2(h, N, 'same');
-                Data(Data < 0) = 0;
-                NNodes = {};
-
-                LocMax = [];
-                for jj = 2:size(Data, 1)-1
-                    for kk = 2:size(Data, 2)-1
-                        Int = [max(1, jj-2) min(jj+2, size(Data, 1)) ...
-                            max(1, kk-2) min(kk+2, size(Data, 2))];
-                        if Data(jj, kk) == max(Data(Int(1):Int(2), Int(3):Int(4)), [], 'all', 'omitnan')
-                            LocMax(end+1, :) = [Data(jj, kk), jj, kk];
-
-                        end
-                    end
-                end
-                LocMax(LocMax(:,1) <  options.Merge.LocMaxThre, :) = [];
-
-                if height(LocMax) == 0
-                    NNodes{end + 1} = NAN(IdGmd == jj, :);
-                    break
-                end
-
-                XY = [NAN.chrom_apex, NAN.Accu_mass];
-                IdGmd = kmeans(XY, height(LocMax), 'Start', [Xedges(LocMax(:, 2))' Yedges(LocMax(:, 3))']);
-
-                for jj = 1:max(IdGmd)
-                    if numel(NAN.Id2Tgt(IdGmd == jj)) - numel(unique(NAN.Id2Tgt(IdGmd == jj))) > max(round(0.05*numel(unique(NAN.Id2Tgt(IdGmd == jj)))), 1) & nLoop <= 5
-                        stepIn = true;
-                        nLoop = nLoop + 1;
-                        break
-
-                    else
-                        NNodes{end + 1} = NAN(IdGmd == jj, :);
-                    end
-                end
-
-                if stepIn
-                    StdMz = StdMz/2;
-                    StdTm = StdTm/2;
-
-                else
-                    break
-
-                end
-
-            end
-
             ToKtoD = IdDoublons;
             sTarget = target(Summary.ID(IdDoublons), :);
             ToKtoD(:, 2) = NaN;
             ToKtoD(:, 3) = Summary.ID(IdDoublons);
+            for jj = 1:10
+                NNodes{jj} = table(); 
+
+            end
+            
+            for jj = 1:height(NAN)
+
+                [~, idX] = min(...
+                    ((NAN.Accu_mass(jj) - sTarget.Targetmz)).^2+...
+                    ((NAN.chrom_apex(jj) - sTarget.TargetTime)).^2);
+                NNodes{idX} = [NNodes{idX}; NAN(jj, :)];
+            end
+
             for jj = 1:numel(NNodes)
                 pAN = NNodes{jj};
 
-                if height(pAN) <= options.Merge.minRepl(1), continue; end
+                try
 
-                XY = [pAN.chrom_apex, pAN.Accu_mass];
-                gmd = gmdistribution(mean(XY), cov(XY));
-                pAN(mahal(gmd, XY) > options.Merge.MahalThres, :) = [];
-                XY = [pAN.chrom_apex, pAN.Accu_mass];
-                gmd = gmdistribution(mean(XY), cov(XY));
+                    if isempty(pAN), continue; end
 
-                LD = find(histcounts(pAN.Id2Tgt, 1:max(pAN.Id2Tgt)+1) > 1);
-                ID = [];
-                for kk = 1:numel(LD)
-                    IdD = find(pAN.Id2Tgt == LD(kk));
-                    mahald2 = mahal(gmd, [pAN.chrom_apex(IdD), pAN.Accu_mass(IdD)]);
-                    [~, IdM] = min(mahald2);
-                    IdD(IdM) = [];
-                    ID = [ID; IdD];
+                    while numel(pAN.Id2Tgt) ~= numel(unique(pAN.Id2Tgt))
+                        [~, id] = max(((pAN.Accu_mass - target.Targetmz(ii))/std(pAN.Accu_mass)).^2 +...
+                            ((pAN.chrom_apex - target.TargetTime(ii))/std(pAN.chrom_apex)).^2);
+                        pAN(id, :) = [];
+
+                    end
+                catch
+                    disp("pp")
 
                 end
-                pAN(ID, :) = [];
 
+                if height(pAN) < options.Merge.minRepl(1), continue; end
+                XY = [pAN.chrom_apex, pAN.Accu_mass];
+               
                 if height(pAN) > options.Merge.minRepl(1)
                     [~, IdT] = min(((mean(pAN.chrom_apex)-sTarget.TargetTime)/std(pAN.chrom_apex)).^2+((mean(pAN.Accu_mass)-sTarget.Targetmz)/std(pAN.Accu_mass)).^2);
 
@@ -514,12 +500,13 @@ while 1
                         Summary.Std_MZV(IdTgt) = std(pAN.ms_variance, [], 'omitnan');
                         Summary.MS_Assym(IdTgt) = mean(pAN.ms_assym, 'omitnan');
                         Summary.n(IdTgt) = height(pAN);
+                        Summary.toTest(IdTgt) = false;
                         ToKtoD(IdT, 2) = 1;
 
                     else
                         IdTgt = ToKtoD(IdT, 1);
                         if Summary.n(IdTgt) < height(pAN)
-                           V = (1:sum(strcmp(obj.Summary.FinneeType, Tag2Fin)))';
+                             V = (1:sum(strcmp(obj.Summary.FinneeType, Tag2Fin)))';
                             [~, ia, ib] = intersect(V, pAN.Id2Tgt);
                             V(ia, 2:4) = [pAN.chrom_area(ib), pAN.chrom_centroid(ib), pAN.Accu_mass(ib)];
                             Area.Values(Area.ID ==  Summary.ID(IdTgt), :) = V(:, 2)';
@@ -539,6 +526,7 @@ while 1
                             Summary.Std_MZV(IdTgt) = std(pAN.ms_variance, [], 'omitnan');
                             Summary.MS_Assym(IdTgt) = mean(pAN.ms_assym, 'omitnan');
                             Summary.n(IdTgt) = height(pAN);
+                            Summary.toTest(IdTgt) = false;
 
                         end
                     end
@@ -560,6 +548,7 @@ while 1
 
     if doStop, break; end
 end
+Summary.toTest = [];
 
 if ~isfield(myMrgPeakList, 'TargetedAnalysis')
     myMrgPeakList.TargetedAnalysis = {};
@@ -572,5 +561,44 @@ myMrgPeakList.TargetedAnalysis{end}.Area = Area;
 myMrgPeakList.TargetedAnalysis{end}.Features = Features;
 myMrgPeakList.TargetedAnalysis{end}.mapFiles = myMapFiles;
 save(obj.FeaturesLists{Id2PeakList}.Original.Name, 'myMrgPeakList')
+
+function OutputList = MyRecursive(inputList, Dmz, tm, minsize, OutputList)
+        ThisTag = true;
+
+        inputList = sortrows(inputList, "Accu_mass");
+        MySplits = ((inputList.Accu_mass(2:end)-inputList.Accu_mass(1: end-1))./...
+            ((inputList.Accu_mass(1: end-1)+ inputList.Accu_mass(2:end))/2))*1000000;
+        MySplits(:, 2) = MySplits(:, 1) > Dmz;
+        if any(MySplits(:, 2)), ThisTag = false; end
+
+        list1 = unique([0; find(MySplits(:, 2)); height(inputList)]);
+        for iMR = 1:numel(list1)-1
+            SplitList1 = inputList(list1(iMR)+1:list1(iMR+1), :);
+
+            if height(SplitList1) >= minsize
+                SplitList1 = sortrows(SplitList1, "chrom_apex");
+                My2nSplits = (SplitList1.chrom_apex(2:end) - SplitList1.chrom_apex(1:end-1));
+                My2nSplits(:, 2) = My2nSplits(:, 1) > tm;
+                if any(My2nSplits(:, 2)), ThisTag = false; end
+
+                list2 = unique([0; find(My2nSplits(:, 2)); height(SplitList1)]);
+
+                for jMR = 1:numel(list2)-1
+                    SplitList2 = SplitList1(list2(jMR)+1:list2(jMR+1), :);
+
+                    if height(SplitList2) >= minsize
+                        if ~ ThisTag
+                            OutputList = MyRecursive(SplitList2, Dmz, tm, minsize, OutputList);
+
+                        else
+                            OutputList{end+1} = inputList;
+
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
 
 

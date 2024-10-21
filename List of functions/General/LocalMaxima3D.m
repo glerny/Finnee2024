@@ -40,5 +40,8 @@ for ii = 2:size(XY, 1)-1
         end
     end
 end
-LocMax = sortrows(LocMax, -1);
+
+if ~isempty(LocMax)
+    LocMax = sortrows(LocMax, -1);
+end
 

@@ -301,7 +301,7 @@ for ii = 1:size(Hlim, 1)
             lmP = LocalMaxima( [x, sum(xy, 1)'],  Options.WindowTime, 0);
             if ~isempty(lmP) & size(XIP, 1) > Options.minTime
 
-                lmP(lmP(:, 2) == max(lmP(:, 2)), :); lmP = lmP(1, :);
+                lmP = lmP(lmP(:, 2) == max(lmP(:, 2)), :);
                 Id2M = XIP(:, 2) ~= 0;
 
                 CM_PF = ChrMoment(XIP(:, [1 3]), 3);

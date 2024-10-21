@@ -51,6 +51,11 @@ end
 Id2Dataset = strcmp(['Dataset', num2str(dts)], obj.Datasets.Name);
 infoDataset = load(fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset}, 'infoDataset.mat'));
 infoDataset = infoDataset.infoDataset;
+
+if isempty(infoDataset.minNoise) | ~isfinite(infoDataset.minNoise)
+    infoDataset.minNoise = 1;
+end
+
 minNoise = infoDataset.minNoise;
 
 fidRead = fopen(fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset}, 'Profiles.dat'), 'rb');
@@ -441,39 +446,6 @@ provMat(:,3) = [0; newSpectra(1:end-1, 2)];
 newSpectra = newSpectra(sum(provMat, 2) > 0, :);
 short_mzAxis =  newSpectra(:,1);
 
-% ScNu = 0;
-% CurSeq = zeros(numel(short_mzAxis), 2);
-% for ii = 1:numel(newProfiles(:,1))
-%     ScanName = fullfile(obj.Path2Fin, newDataset,...
-%         'Scans', ['Scan#', num2str(newProfiles(ii,1)), '.dat']);
-%     fidRead = fopen(ScanName, 'rb');
-%     myMS = fread(fidRead, ...
-%         [newProfiles(ii, 8) newProfiles(ii, 9)],...
-%         "double");
-%     fclose(fidRead);
-% 
-%     if isempty(myMS)
-%         cMZ = short_mzAxis; cMZ(:, 2) = 0;
-% 
-%     else
-%         [~, IdI] = intersect(short_mzAxis, myMS(:,1));
-%         cMZ = short_mzAxis; cMZ(IdI, 2) = myMS(:,2);
-%     end
-%     
-%     %Record MZSpectra
-%     IdNnz = cMZ(:, 2) > options.Sig2Nois*minNoise;
-%     IdStart = CurSeq(:, 2) == 0 & IdNnz;
-%     CurSeq(IdStart, 1) = ii;
-%     CurSeq(IdNnz, 2) = CurSeq(IdNnz, 2) + 1;
-% 
-%     % Check Length
-%     IdMatch = newSpectra(:,8) < CurSeq(:, 2) & ~IdNnz;
-%     newSpectra(IdMatch, 8) = CurSeq(IdMatch, 2);
-%     CurSeq(~IdNnz, 2) = 0;
-% end
-% IdMatch = newSpectra(:,8) < CurSeq(:, 2);
-% newSpectra(IdMatch, 8) = CurSeq(IdMatch, 2);
-
 options.baseline = [myBaselineFunction.Algo, ':', num2str(myBaselineFunction.pm1), ':', num2str(myBaselineFunction.pm2)];
 infoDataset.dateofcreation = datetime("now");
 infoDataset.AdditionalInformation = AdditionalInformation;
@@ -486,12 +458,9 @@ infoDataset.Profiles.size = size(newProfiles);
 infoDataset.Spectra.size = size(newSpectra);
 infoDataset.NoiseVector = Noise;
 
-% infoDataset.Spectra.column{8}.name = '???'; % CANT REMEMBER THE USE OF THIS VARIABLE...
-% infoDataset.Spectra.column{8}.labelUnits = obj.Datasets.Labels{end}.AxisZ.Label;
-% infoDataset.Spectra.column{8}.units = obj.Datasets.Labels{end}.AxisZ.Units;
-% infoDataset.Spectra.column{8}.formatUnits = obj.Datasets.Labels{end}.AxisZ.fo;
-% infoDataset.Spectra.column{8}.ShowMe = false;
-
+if infoDataset.minNoise == 1
+    infoDataset.minNoise = mean(Noise(:, 5) < prctile(Noise(:, 5), 5), 'omitnan');
+end
 
 obj.Datasets = [obj.Datasets; ...
     {newDataset, '', true, true, true, true, false, ...
@@ -499,6 +468,7 @@ obj.Datasets = [obj.Datasets; ...
     options,  'Baseline_correction', {}}];
 
 save(fullfile(obj.Path2Fin, newDataset, 'infoDataset.mat'), 'infoDataset');
+
 %Record Spectra
 fileName = fullfile(obj.Path2Fin, newDataset, 'Profiles.dat');
 [fidWriteDat, errmsg]  = fopen(fileName, 'wb');
@@ -536,10 +506,10 @@ copyfile(fileName_old, fileName_new)
         options.size4Noise    = [];
         options.wdw4corr        = 2;
         options.ParallelMe      = false;
-        options.Spk4noise       = 4;
+        options.Spk4noise       = 3;
         options.Sig2Nois        = 3;
-        options.HRMS.shiftbsl   = 500;
-        options.HRMS.n          = 2;
+        options.HRMS.shiftbsl   = 50;
+        options.HRMS.n          = 1;
         options.HRMS.k          = 10;
 
 

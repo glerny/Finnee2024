@@ -397,6 +397,7 @@ save(fullfile(obj.Path2Fin, 'myFinnee.mat'), 'myFinnee')
         options.Sig2Nois        = 3;
         options.MinMinNoise     = [100, 10];
         options.ParallelMe      = false;
+        options.getDerivatives  = true;
 
         % 3- Decipher varargin
         input = @(x) find(strcmpi(varargin,x),1);
