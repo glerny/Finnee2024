@@ -1,4 +1,4 @@
-function obj = mkMergedFinnee(obj, dataset2beMerged, partitions, Tag4files2merged, Tag4newfiles, isAligned, doInterpolate)
+function obj = mkMergedFinnee(obj, dataset2beMerged, partitions, Tag4files2merged, Tag4newfiles, isAligned)
 
 IdF = find(strcmp(obj.Summary.FinneeType, Tag4files2merged));
 FolderOut = fullfile(obj.OutputFolder, 'MergedFinnee');
@@ -45,8 +45,7 @@ for ii = 1:partitions
             'FinneesIn', dirs, ...
             'folderOut', FolderOut, ...
             'fileID', fileID, ...
-            'spikes', 0, ...
-            'doInterpolate', doInterpolate);
+            'spikes', 0);
 
     else
         myFinnee = Finnee('Multiple', 'overwrite', ...
@@ -55,8 +54,7 @@ for ii = 1:partitions
             'FinneesIn', dirs, ...
             'folderOut', FolderOut, ...
             'fileID', fileID, ...
-            'spikes', 0, ...
-            'doInterpolate', doInterpolate);
+            'spikes', 0);
 
     end
     
@@ -69,7 +67,7 @@ for ii = 1:partitions
 
 end
 
-obj.Summary = [obj.Summary; table(FileID, FolderID, FinneeType, StartTime, EndTime, Dataset4Quali, Dataset4Quant)];
+obj.Summary = [obj.Summary; table(FileID, FolderID, FinneeType, StartTime, EndTime, Dataset4Quali, Dataset4Quant, AlignMe)];
 myProject = obj; %#ok<*NASGU>
 save(fullfile(obj.Path2Project, 'myProject.mat'), 'myProject')
 

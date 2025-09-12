@@ -16,6 +16,7 @@ if ~isempty(startTag)
     while 1
         IxT = strfind(newLine, ' ');
         if isempty(IxT); IxT = length(newLine); end
+        IxT = IxT(1);
         if  strcmp(newLine(2:IxT-1), startTag)
             break
             
@@ -122,6 +123,7 @@ while 1
     
     IxT = strfind(newLine, ' ');
     if isempty(IxT); IxT = length(newLine); end
+    IxT = IxT(1);
     if  strcmp(newLine(2:IxT-1), endTag)
         break
         

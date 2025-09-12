@@ -1,6 +1,5 @@
 %% DESCRIPTION
-% ALIGN2NEWMZ is used to normalise every MS scans in a datasets to a
-% common mz axis.
+% INTERPOLATE2D 
 %
 %% INPUT PARAMETERS
 % *Compulsory*
@@ -17,11 +16,7 @@
 %             Remove spikes in every MS scans If used, where spikes are any
 %             peaks in each MS of length equal or lower that the integer.
 %             'spikes' followed by 0 allows to to turn off spikes removal.
-% *meth4int'  : Followed by a string to specify an alternative
-%             interpolation method: 'nearest', 'next', 'previous',
-%             'linear','spline','pchip', or 'cubic'. The default method is
-%             'linear'. help interp1 for more information on the
-%             interpolation function. Changing this option is not advised.
+% TO BE DONE
 %
 %% OUTPUT PARAMETERS
 % *obj      : The Finnee object. !Important, if not input parameter is used
@@ -35,7 +30,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [obj, Axis] = interp2masterMZ(obj, dts, mzAxis, varargin)
+function [obj, Axis] = Interpolate2D(obj, dts, Axis, varargin)
 
 %% CORE OF THE FUNCTION
 % 1- Initialisation and options
@@ -49,7 +44,7 @@ if nargin == 2 & isstruct(dts)
     Id2Dataset = strcmp(['Dataset', num2str(dts)], obj.Datasets.Name);
     infoDataset = load(fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset}, 'infoDataset.mat'));
     infoDataset = infoDataset.infoDataset;
-    if ~ options.MstAxis, mzAxis = []; end
+    Axis = options.Axis;
     options.ParallelMe = true;
 
 else
@@ -58,8 +53,8 @@ else
     infoDataset = load(fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset}, 'infoDataset.mat'));
     infoDataset = infoDataset.infoDataset;
     options = checkVarargin(dts, varargin{:});
-
-    if nargin == 2, mzAxis = []; end
+    if nargin == 2, Axis = {}; end
+    options.Axis = Axis;
 end
 
 Id2Dataset = strcmp(['Dataset', num2str(dts)], obj.Datasets.Name);
@@ -82,74 +77,149 @@ obj.Datasets = [obj.Datasets; ...
     ['Dataset', num2str(dts)], obj.Datasets.Labels{Id2Dataset}, ...
     options, 'Master_mz_axis', {}}];
 
-%% Load or create master mz Axis
-if isempty(mzAxis)
-
-    % Get the index of the scan with the highest total intensity
-    fidRead = fopen(fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset}, 'Profiles.dat'), 'rb');
-    Profiles = fread(fidRead, [infoDataset.Profiles.size], "double");
-    fclose(fidRead);
-    Profiles = array2table(Profiles);
-    ColumnNames = {}; ColumnUnits = {};
-    for ii = 1:numel(infoDataset.Profiles.column)
-        ColumnNames{ii} = infoDataset.Profiles.column{ii}.name;
-        ColumnLabels{ii} = infoDataset.Profiles.column{ii}.labelUnits;
-        ColumnUnits{ii} = infoDataset.Profiles.column{ii}.units;
-        ColumnFO{ii}    = infoDataset.Profiles.column{1, 1}.formatUnits;
-    end
-    Profiles.Properties.VariableNames = ColumnNames;
-    Profiles.Properties.VariableUnits = ColumnUnits;
-    Id1 = find(Profiles.Non_Null_Elements_Profile == max(Profiles.Non_Null_Elements_Profile));
-    Id2 = Profiles.Total_Ions_Profile(Id1) == max(Profiles.Total_Ions_Profile(Id1));
-    IdAxis = Id1(Id2);
-
-    ScanName = fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset},...
-        'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdAxis, 1)), '.dat']);
-    fidRead = fopen(ScanName, 'rb');
-    myMS = fread(fidRead, ...
-        [Profiles.Length_MS_Scan_Profile(IdAxis) Profiles.Column_MS_Scan_Profile(IdAxis)],...
-        "double");
-    fclose(fidRead);
-
-    [mzAxis, data4axis, stats] = mkMasterMZ(myMS, options.Split, options.orderPolynomial, options.YLim, 1);
-    AdditionalInformation.MasterMZAxis.Data4Axis = data4axis;
-    AdditionalInformation.MasterMZAxis.p = stats;
-    AdditionalInformation.MasterMZAxis.r2 = stats.r2;
-    AdditionalInformation.MasterMZAxis.n  =  options.orderPolynomial; 
-    Axis.Data4Axis = data4axis;
-    Axis.p = options.orderPolynomial;
-
+%% Load or create first mz Axis
+% Get the index of the scan with the highest total intensity
+fidRead = fopen(fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset}, 'Profiles.dat'), 'rb');
+Profiles = fread(fidRead, [infoDataset.Profiles.size], "double");
+fclose(fidRead);
+Profiles = array2table(Profiles);
+ColumnNames = {}; ColumnUnits = {};
+for ii = 1:numel(infoDataset.Profiles.column)
+    ColumnNames{ii}     = infoDataset.Profiles.column{ii}.name;
+    ColumnLabels{ii}    = infoDataset.Profiles.column{ii}.labelUnits;
+    ColumnUnits{ii}     = infoDataset.Profiles.column{ii}.units;
+    ColumnFO{ii}        = infoDataset.Profiles.column{1, 1}.formatUnits;
 end
-Axis.Axis = mzAxis;
+Profiles.Properties.VariableNames = ColumnNames;
+Profiles.Properties.VariableUnits = ColumnUnits;
+Id1 = find(Profiles.Non_Null_Elements_Profile == max(Profiles.Non_Null_Elements_Profile));
+Id2 = Profiles.Total_Ions_Profile(Id1) == max(Profiles.Total_Ions_Profile(Id1));
+IdAxis = Id1(Id2);
 
+ScanName = fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset},...
+    'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdAxis, 1)), '.dat']);
+fidRead = fopen(ScanName, 'rb');
+myMS = fread(fidRead, ...
+    [Profiles.Length_MS_Scan_Profile(IdAxis) Profiles.Column_MS_Scan_Profile(IdAxis)],...
+    "double");
+fclose(fidRead);
+
+[mzAxis, data4axis, stats] ...
+                                            = mkMasterMZ(myMS, options.split, options.orderPolynomial, options.YLim, 1);
+AdditionalInformation.FirstMzAxis.Data4Axis = data4axis;
+AdditionalInformation.FirstMzAxis.stats     = stats;
+AdditionalInformation.FirstMzAxis.n         =  size(data4axis, 1);
+
+myAxis.FirstMzAxis.p      = options.orderPolynomial;
+myAxis.FirstMzAxis.stats  = stats;
+myAxis.FirstMzAxis.Data   = mzAxis;
+
+doSecondaryMz = false;
+myAxis.TimeAxis.Data    = Profiles.Scan_Time;
+
+if isempty(Axis)
+    myAxis.TimeAxis.Data    = Profiles.Scan_Time;
+
+else
+    if isfield(Axis, 'TimeAxis')
+        myAxis.TimeAxis.Data = Axis.TimeAxis;
+
+    end
+    if isfield(Axis, 'mzAxis')
+        doSecondaryMz = true;
+        myAxis.SecondMzAxis.Data = Axis.mzAxis;
+
+    end
+end
+
+timeAxis = myAxis.TimeAxis.Data;
 mzInterval = [inf 0];
 mkdir(fullfile(obj.Path2Fin, newDataset));
 mkdir(fullfile(obj.Path2Fin, newDataset, 'Scans'));
 newProfiles = [];
-newSpectra = mzAxis; newSpectra(:, 7) = 0;
 
-%% Align to MZaxis, average if needed & calcualted base profiles
+if doSecondaryMz
+    mzAxis = myAxis.SecondMzAxis.Data;
+
+else
+    mzAxis = myAxis.FirstMzAxis.Data;
+end
+newSpectra = mzAxis; newSpectra(:, 7) = 0;
+fAxis = myAxis.FirstMzAxis.Data;
+
+%% Interpolate to MZaxis, average if needed & calcualted base profiles
 if ~options.ParallelMe, h = waitbar(0,'processing scans'); end
 
 counter = 1;
-skipRecording = false;
 ScNu = 0;
 CurSeq = zeros(numel(mzAxis), 2);
-for ii = 1:numel(Profiles.Scan_Index)
-    if ~options.ParallelMe, waitbar(ii/numel(Profiles.Scan_Index)); end
+scanNum = 0;
 
-    ScanName = fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset},...
-        'Scans', ['Scan#', num2str(Profiles.Scan_Index(ii, 1)), '.dat']);
-    fidRead = fopen(ScanName, 'rb');
-    myMS = fread(fidRead, ...
-        [Profiles.Length_MS_Scan_Profile(ii) Profiles.Column_MS_Scan_Profile(ii)],...
-        "double");
-    fclose(fidRead);
+BNV = []; % Black noise vector
+for ii = 1:numel(timeAxis)
+    if ~options.ParallelMe, waitbar(ii/numel(timeAxis)); end
 
-    vq =  interp1(myMS(:,1), myMS(:,2), mzAxis,...
-        options.mth4interp1);
-    vq(~isfinite(vq)) = 0;
-    myMS = [mzAxis, vq];
+    IdS = find (timeAxis(ii) == Profiles.Scan_Time);
+
+    if ~isempty(IdS) % If same axis
+        ScanName = fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset},...
+            'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdS)), '.dat']);
+        fidRead = fopen(ScanName, 'rb');
+        myMS = fread(fidRead, ...
+            [Profiles.Length_MS_Scan_Profile(IdS) Profiles.Column_MS_Scan_Profile(IdS)],...
+            "double");
+        fclose(fidRead);
+
+        vq =  interp1(myMS(:,1), myMS(:,2), mzAxis,...
+            options.mth4interp1);
+        vq(~isfinite(vq)) = 0;
+        myMS = [mzAxis, vq];
+
+    else
+
+        % find n-2:n+2 in old axis
+        IdS = findCloser(timeAxis(ii), Profiles.Scan_Time);
+        if IdS < 2, continue; end
+        if IdS > numel(Profiles.Scan_Time)-1; break; end
+
+        if timeAxis(ii) - Profiles.Scan_Time(IdS) < 0
+            IdS1 = IdS-1;
+            IdS2 = IdS;
+
+        else
+            IdS1 = IdS;
+            IdS2 = IdS+1;
+        end
+
+        ScanName = fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset},...
+            'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdS1)), '.dat']);
+        fidRead = fopen(ScanName, 'rb');
+        myMS = fread(fidRead, ...
+            [Profiles.Length_MS_Scan_Profile(IdS1) Profiles.Column_MS_Scan_Profile(IdS1)],...
+            "double");
+        fclose(fidRead);
+
+        vq =  interp1(myMS(:,1), myMS(:,2), mzAxis,...
+            options.mth4interp1);
+
+        ScanName = fullfile(obj.Path2Fin, obj.Datasets.Name{Id2Dataset},...
+            'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdS2)), '.dat']);
+        fidRead = fopen(ScanName, 'rb');
+        myMS = fread(fidRead, ...
+            [Profiles.Length_MS_Scan_Profile(IdS2) Profiles.Column_MS_Scan_Profile(IdS2)],...
+            "double");
+        fclose(fidRead);
+
+        vq(:, 2) =  interp1(myMS(:,1), myMS(:,2), mzAxis,...
+            options.mth4interp1);
+        vq(~isfinite(vq)) = 0;
+     
+
+         vq2D = interp1(Profiles.Scan_Time(IdS1:IdS2), vq', timeAxis(ii));
+         vq2D(~isfinite(vq2D)) = 0;
+         myMS = [mzAxis, vq2D'];
+
+    end
 
     % Filter spikes if needed
     if ~isempty(myMS) && options.RemSpks
@@ -157,53 +227,13 @@ for ii = 1:numel(Profiles.Scan_Index)
         myMS    = spikesRemoval(myMS, spkSz );
     end
 
-    if options.AverageScans > 1
-        if counter == 1
-            mMS = myMS;
-            mii = ii;
-            counter = counter + 1;
-            skipRecording = true;
-            mTime = Profiles.Scan_Time(ii);
-
-        elseif counter < options.AverageScans
-            mMS(:, 2) = mMS(:, 2) +  myMS(:,2);
-            mii = mii + ii;
-            counter = counter + 1;
-            skipRecording = true;
-            mTime = mTime + Profiles.Scan_Time(ii);
-
-        else
-            mMS(:, 2) = mMS(:, 2) +  myMS(:,2);
-            mii = mii + ii;
-            mMS(:,2) = mMS(:,2)/counter;
-            mii = round(mii/counter);
-            mTime = mTime + Profiles.Scan_Time(ii);
-            mTime = mTime/counter;
-            counter = 1;
-            ScanNumber = ScNu;
-            ScNu = ScNu + 1;
-            skipRecording = false;
-
-        end
-    else
-            mMS =  myMS;
-            mii =  ii;
-            mTime = Profiles.Scan_Time(ii);
-            ScanNumber = ScNu;
-            ScNu = ScNu + 1;
-
-    end
-
-    if skipRecording, continue; end
-
-    % find and remove spikes
-    if options.RemSpks
-        spkSz  = options.SpkSz;
-        mMS = spikesRemoval(mMS, spkSz );
-    end
+    mii =  ii;
+    mTime = timeAxis(ii);
+    ScanNumber = scanNum;
+    scanNum = scanNum + 1;
 
     %Record MZSpectra
-    IdNnz = mMS(:, 2) > 0;
+    IdNnz = myMS(:, 2) > 0;
     newSpectra(:,2) = newSpectra(:,2) + double(IdNnz);
     IdStart = CurSeq(:, 2) == 0 & IdNnz;
     CurSeq(IdStart, 1) = ScanNumber+1;
@@ -214,40 +244,40 @@ for ii = 1:numel(Profiles.Scan_Index)
     newSpectra(IdMatch, 3) = CurSeq(IdMatch, 2);
     newSpectra(IdMatch, 4) = CurSeq(IdMatch, 1);
     CurSeq(~IdNnz, 2) = 0;
-    newSpectra(:,5) = newSpectra(:,5) + mMS(:, 2);
-    newSpectra(:,6) = max([newSpectra(:,6), mMS(:, 2)], [], 2);
+    newSpectra(:,5) = newSpectra(:,5) + myMS(:, 2);
+    newSpectra(:,6) = max([newSpectra(:,6), myMS(:, 2)], [], 2);
     
     % reduced trailing zero in excess
-    if ~isempty(mMS)
-        provMat      = [mMS(2:end, 2); 0];
-        provMat(:,2) = mMS(:, 2);
-        provMat(:,3) = [0; mMS(1:end-1, 2)];
-        mMS         = mMS(sum(provMat, 2) > 0, :);
+    if ~isempty(myMS)
+        provMat      = [myMS(2:end, 2); 0];
+        provMat(:,2) = myMS(:, 2);
+        provMat(:,3) = [0; myMS(1:end-1, 2)];
+        myMS         = myMS(sum(provMat, 2) > 0, :);
     end
 
-    if min(mMS(:,1)) < mzInterval(1), mzInterval(1) = min(mMS(:,1)); end
-    if max(mMS(:,1)) > mzInterval(2), mzInterval(2) = max(mMS(:,1)); end
+    if min(myMS(:,1)) < mzInterval(1), mzInterval(1) = min(myMS(:,1)); end
+    if max(myMS(:,1)) > mzInterval(2), mzInterval(2) = max(myMS(:,1)); end
 
-    if isempty(mMS)| size(mMS, 1) == 1 | sum(mMS(:, 2)) == 0
+    if isempty(myMS)| size(myMS, 1) == 1 | sum(myMS(:, 2)) == 0
         newProfiles(ScanNumber+1, :) = [ScanNumber, ...
-            mTime,  nan, 0, sum(mMS(:,2)), 0, ...
-            nnz(mMS(:,2)), size(mMS), nan];
+            mTime,  nan, 0, sum(myMS(:,2)), 0, ...
+            nnz(myMS(:,2)), size(myMS), nan];
 
     else
 
-        M = ChrMoment(mMS, 2);
+        M = ChrMoment(myMS, 2);
         newProfiles(ScanNumber+1, :) = [ScanNumber, ...
             mTime, ...
-            nan, max(mMS(:,2)), sum(mMS(:,2)), ...
-            min(mMS(mMS(:, 2) ~= 0, 2)), nnz(mMS(:,2)), ...
-            size(mMS), M(2)];
+            nan, max(myMS(:,2)), sum(myMS(:,2)), ...
+            min(myMS(myMS(:, 2) ~= 0, 2)), nnz(myMS(:,2)), ...
+            size(myMS), M(2)];
 
     end
 
     fileName = fullfile(obj.Path2Fin, newDataset, 'Scans', ['Scan#', ...
         num2str(ScanNumber), '.dat']);
     [fidWriteDat, errmsg]  = fopen(fileName, 'wb');
-    fwrite(fidWriteDat, mMS(:), "double");
+    fwrite(fidWriteDat, myMS(:), "double");
     fclose(fidWriteDat);
 end
 try close(h); catch, end
@@ -262,46 +292,8 @@ provMat(:,3) = [0; newSpectra(1:end-1, 2)];
 newSpectra = newSpectra(sum(provMat, 2) > 0, :);
 short_mzAxis =  newSpectra(:,1);
 
-% Find mz lines with only spikes
-IdSpikes = ~isnan(newSpectra(:, 6)) ...
-    & newSpectra(:, 3) <= options.Spk4noise;
-if sum(IdSpikes) < options.MinMinNoise(1)
-    minNoise = options.MinMinNoise(2);
-    DoNoise = false;
-
-else
-    DoNoise = true;
-
-end
-
-ScNu = 0;
-CurSeq = zeros(numel(short_mzAxis), 2);
-NoiseVector = [];
-
-for ii = 1:numel(newProfiles(:,1))
-    ScanName = fullfile(obj.Path2Fin, newDataset,...
-        'Scans', ['Scan#', num2str(newProfiles(ii,1)), '.dat']);
-    fidRead = fopen(ScanName, 'rb');
-    myMS = fread(fidRead, ...
-        [newProfiles(ii, 8) newProfiles(ii, 9)],...
-        "double");
-    fclose(fidRead);
-
-    if isempty(myMS)
-        cMZ = short_mzAxis; cMZ(:, 2) = 0;
-
-    else
-        [~, IdI] = intersect(short_mzAxis, myMS(:,1));
-        cMZ = short_mzAxis; cMZ(IdI, 2) = myMS(:,2);
-    end
-    
-    % Record Noise
-    NoiseVector = [NoiseVector; cMZ(IdSpikes & cMZ(:, 2) > 0, 2)];
-
-end
-NoiseVector(isoutlier(NoiseVector)) = [];
-NoiseVector(isoutlier(NoiseVector)) = [];
-minNoise = round(mean(NoiseVector) + 2*std(NoiseVector));
+BNV(isoutlier(BNV)) = [];
+minNoise = mean(BNV) + 2*std(BNV);
 
 infoDataset.dateofcreation = datetime("now");
 infoDataset.AdditionalInformation = AdditionalInformation;
@@ -389,15 +381,15 @@ save(fullfile(obj.Path2Fin, 'myFinnee.mat'), 'myFinnee')
         options.mth4interp1     = 'linear';
         options.MstAxis         = false;
         options.YLim            = infoDataset.mzInterval;
-        options.Split           = 3;
         options.orderPolynomial = 3;
+        options.split           = 10;
         options.parentDataset   = dts;
         options.AverageScans    = 1;
         options.Spk4noise       = 3;
         options.Sig2Nois        = 3;
         options.MinMinNoise     = [100, 10];
         options.ParallelMe      = false;
-        options.getDerivatives  = true;
+        options.ScanRate        = 'average';
 
         % 3- Decipher varargin
         input = @(x) find(strcmpi(varargin,x),1);
@@ -430,61 +422,56 @@ save(fullfile(obj.Path2Fin, 'myFinnee.mat'), 'myFinnee')
             end
         end
 
-        tgtIx = input('AverageScans');
+        tgtIx = input('ScanRate');
         if ~isempty(tgtIx)
-            options.AverageScans = varargin{tgtIx +1};
+            %TODO: test scanRate for 'low', 'normal', 'high'
+            options.ScanRate = varargin{tgtIx +1};
         end
     end
 
-% %% Extrapolate master MZ axis
-%     function [mzAxis, r2, XY] = mkMasterMZ(MS, n, Lim, ratio)
-%         %UNTITLED Summary of this function goes here
-%         %   Detailed explanation goes here
-% 
-%         if nargin == 1
-%             Lim = infoDataset.mzInterval;
-%             n   = 3;
-%             ratio = 1;
-%         elseif nargin == 2
-%             Lim = infoDataset.mzInterval;
-%             ratio = 1;
-%         elseif nargin == 3
-%             ratio = 1;
-%         end
-% 
-%         W2C = zeros([size(MS, 1)+2 5]);
-%         W2C(2:end-1, 1) = MS(:,1);
-%         W2C(1:end-2, 2) = MS(:,1);
-%         W2C(2:end-1, 3) = MS(:,2);
-%         W2C(:,4) = circshift(W2C(:,3), -1);
-%         W2C(:,5) = circshift(W2C(:,3), +1);
-%         W2C(W2C(:,3) == 0 | W2C(:,4) == 0 | W2C(:,5) == 0, :) = [];
-% 
-%         XY = [W2C(:,1), W2C(:,2)-W2C(:,1)];
-%         [p, S, mu] = polyfit(XY(:,1), XY(:,2), n);
-%         XY(:, 3) = polyval(p, XY(:,1), S, mu);
-%         XY(:, 4) = sqrt((XY(:, 2) - XY(:, 3)).^2);
-%         XY(XY(:, 4) > mean(XY(:, 4)) + 5*std(XY(:, 4)), :) = [];
-% 
-%         [p, S, mu] = polyfit(XY(:,1), XY(:,2), n);
-%         XY(:, 3) = polyval(p, XY(:,1), S, mu);
-%         XY(:, 4) = sqrt((XY(:, 2) - XY(:, 3)).^2);
-% 
-%         R = corrcoef(polyval(p, XY(:,1), S, mu), XY(:,2));
-%         r2 = R(1,2);
-%         mzAxis = Lim(1, 1);
-% 
-%         int_old = 0;
-%         while mzAxis(end, 1) < Lim(2)
-%             int = polyval(p, mzAxis(end, 1), S, mu)/ratio;
-%             mzAxis(end+1, 1) = mzAxis(end, 1) + int; %#ok<AGROW>
-%             if int_old > int
-%                 error("")
-%             else
-%                 int_old = int;
-%             end
-%         end
-%     end
+    function IdAl = findCloserIndices(Axis_1, Axis_2)
+        Axis_1(:, 3) = 0;
+        Axis_1(:, 4) = (1:height(Axis_1))';
+        Axis_2(:, 3) = 1;
+        Axis_2(:, 4) = (1:height(Axis_2))';
+        Axis = sortrows([Axis_1; Axis_2], 1);
+        Merged = [];
+
+        while 1
+            Axis = sortrows(Axis, 1);
+            ThisStep = [];
+            Id1 = find(Axis(1:end-1, 3) == 0 & Axis(2:end, 3) == 1);
+            Axis(Id1, 5:7) = Axis(Id1+1, [1:2, 4]);
+            Id2 = find(Axis(2:end, 3) == 0 & Axis(1:end-1, 3) ~= 0);
+            Axis(Id2+1, 8:10) = Axis(Id2, [1:2, 4]);
+
+            IdX = Axis(:, 5) ~= 0 & Axis(:, 8) == 0;
+            ThisStep = [ThisStep; Axis(IdX, [1 4 5 6 7])];
+            Axis(IdX, :) = [];
+
+            IdX = Axis(:, 5) == 0 & Axis(:, 8) ~= 0;
+            ThisStep = [ThisStep; Axis(IdX, [1 4 8 9 10])];
+            Axis(IdX, :) = [];
+
+            IdX = (Axis(:, 5) ~= 0 & Axis(:, 8) ~= 0) & ...
+                (abs(Axis(:, 5) - Axis(:, 1)) <= abs(Axis(:, 8) - Axis(:, 1)));
+            ThisStep = [ThisStep; Axis(IdX, [1 4 5 6 7])];
+            Axis(IdX, :) = [];
+
+            IdX = (Axis(:, 5) ~= 0 & Axis(:, 8) ~= 0) & ...
+                (abs(Axis(:, 5) - Axis(:, 1)) > abs(Axis(:, 8) - Axis(:, 1)));
+            ThisStep = [ThisStep; Axis(IdX, [1 4 8 9 10])];
+            Axis(IdX, :) = [];
+            Axis(:, 5:end) =  [];
+
+            if sum(ThisStep(:, 4)) == 0; break; end
+
+            Merged = [Merged; ThisStep];
+        end
+
+        Merged = sortrows(Merged, 1);
+        IdAl = Merged(:, [2, 5]);
+    end
 
 
 end

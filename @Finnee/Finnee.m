@@ -247,183 +247,343 @@ classdef Finnee
 
                     end
 
-                    % 1. Do the first object
-                    load(fullfile(obj.FinneesIn{1}, 'myFinnee.mat'), 'myFinnee');
-                    fObj = myFinnee;
-                    Id2Dataset = find(strcmp(['Dataset', num2str(targetDataset)], fObj.Datasets.Name));
-                    infoDataset = load(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'infoDataset.mat'));
-                    infoDataset = infoDataset.infoDataset;
 
-                    fidRead = fopen(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'Profiles.dat'), 'rb');
-                    Profiles = fread(fidRead, [infoDataset.Profiles.size], "double");
-                    fclose(fidRead);
-                    Profiles = array2table(Profiles);
-                    ColumnNames = {}; ColumnUnits = {};
-                    for ii = 1:numel(infoDataset.Profiles.column)
-                        ColumnNames{ii} = infoDataset.Profiles.column{ii}.name;
-                        ColumnUnits{ii} = infoDataset.Profiles.column{ii}.units;
-                    end
-                    Profiles.Properties.VariableNames = ColumnNames;
-                    Profiles.Properties.VariableUnits = ColumnUnits;
+                    if options.InterpolateAxis
 
-                    if ~isempty(options.Alignment)
-                        Profiles.Scan_Time = Profiles.Scan_Time +...
-                            polyval(options.Alignment{1}{1}, Profiles.Scan_Time, options.Alignment{1}{2}, options.Alignment{1}{3});
+                        % 1. Do the first object
+                        load(fullfile(obj.FinneesIn{1}, 'myFinnee.mat'), 'myFinnee');
+                        fObj = myFinnee;
+                        Id2Dataset = find(strcmp(['Dataset', num2str(targetDataset)], fObj.Datasets.Name));
+                        infoDataset = load(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'infoDataset.mat'));
+                        infoDataset = infoDataset.infoDataset;
 
-                    end
-                    MasterTm = Profiles.Scan_Time;
+                        fidRead = fopen(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'Profiles.dat'), 'rb');
+                        Profiles = fread(fidRead, [infoDataset.Profiles.size], "double");
+                        fclose(fidRead);
+                        Profiles = array2table(Profiles);
+                        ColumnNames = {}; ColumnUnits = {};
+                        for ii = 1:numel(infoDataset.Profiles.column)
+                            ColumnNames{ii} = infoDataset.Profiles.column{ii}.name;
+                            ColumnUnits{ii} = infoDataset.Profiles.column{ii}.units;
+                        end
+                        Profiles.Properties.VariableNames = ColumnNames;
+                        Profiles.Properties.VariableUnits = ColumnUnits;
 
-                    fidRead = fopen(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'Spectra.dat'), 'rb');
-                    Spectra = fread(fidRead, [infoDataset.Spectra.size], "double");
-                    fclose(fidRead);
-                    Spectra = array2table(Spectra);
-                    ColumnNames = {}; ColumnUnits = {};
-                    for ii = 1:numel(infoDataset.Spectra.column)
-                        ColumnNames{ii} = infoDataset.Spectra.column{ii}.name;
-                        ColumnUnits{ii} = infoDataset.Spectra.column{ii}.units;
-                    end
-                    Spectra.Properties.VariableNames = ColumnNames;
-                    Spectra.Properties.VariableUnits = ColumnUnits;
+                        if ~isempty(options.Alignment)
+                            Profiles.Scan_Time = Profiles.Scan_Time +...
+                                polyval(options.Alignment{1}{1}, Profiles.Scan_Time, options.Alignment{1}{2}, options.Alignment{1}{3});
 
-                    fileName_axis = fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'MasterMZAxis.dat');
-                    fidRead = fopen(fileName_axis, 'rb');
-                    MasterMz = fread(fidRead, inf, "double");
-                    fclose(fidRead);
+                        end
+                        MasterTm = Profiles.Scan_Time;
+
+                        fidRead = fopen(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'Spectra.dat'), 'rb');
+                        Spectra = fread(fidRead, [infoDataset.Spectra.size], "double");
+                        fclose(fidRead);
+                        Spectra = array2table(Spectra);
+                        ColumnNames = {}; ColumnUnits = {};
+                        for ii = 1:numel(infoDataset.Spectra.column)
+                            ColumnNames{ii} = infoDataset.Spectra.column{ii}.name;
+                            ColumnUnits{ii} = infoDataset.Spectra.column{ii}.units;
+                        end
+                        Spectra.Properties.VariableNames = ColumnNames;
+                        Spectra.Properties.VariableUnits = ColumnUnits;
+
+                        fileName_axis = fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'MasterMZAxis.dat');
+                        fidRead = fopen(fileName_axis, 'rb');
+                        MasterMz = fread(fidRead, inf, "double");
+                        fclose(fidRead);
 
 
-                    myDatasets.Name{1, 1} = 'Dataset1';
-                    myDatasets.CreationCode{1, 1} = '';
-                    myDatasets.IsMS1{1, 1} = true;
-                    myDatasets.isProfileScan{1, 1} = true;
-                    myDatasets.HasMasterMZ(1, 1) = true;
-                    myDatasets.isBaseDriftCorr{1, 1} = false;
-                    myDatasets.HasNoiseRem{1, 1} = false;
-                    myDatasets.IsDaugherOff{1, 1} = '';
-                    myDatasets.Labels{1, 1}.AxisX.Label = 'Time';
-                    myDatasets.Labels{1, 1}.AxisX.Units = 'min'; % TODO Check Uniys
-                    myDatasets.Labels{1, 1}.AxisX.fo = '%0.2f';% TODO Check precision
-                    myDatasets.Labels{1, 1}.AxisY.Label = 'm/z';
-                    myDatasets.Labels{1, 1}.AxisY.Units = '';
-                    myDatasets.Labels{1, 1}.AxisY.fo = '%0.4f';
-                    myDatasets.Labels{1, 1}.AxisZ.Label = 'Intensity';
-                    myDatasets.Labels{1, 1}.AxisZ.Units = 'Arb. units';
-                    myDatasets.Labels{1, 1}.AxisZ.fo = '%0.0f';
-                    myDatasets.Options4Creations{1, 1} = options;
-                    myDatasets.PrimaryActions{1, 1} = 'Creation';
-                    myDatasets.SecondaryActions{1, 1} = {};
+                        myDatasets.Name{1, 1} = 'Dataset1';
+                        myDatasets.CreationCode{1, 1} = '';
+                        myDatasets.IsMS1{1, 1} = true;
+                        myDatasets.isProfileScan{1, 1} = true;
+                        myDatasets.HasMasterMZ(1, 1) = true;
+                        myDatasets.isBaseDriftCorr{1, 1} = false;
+                        myDatasets.HasNoiseRem{1, 1} = false;
+                        myDatasets.IsDaugherOff{1, 1} = '';
+                        myDatasets.Labels{1, 1}.AxisX.Label = 'Time';
+                        myDatasets.Labels{1, 1}.AxisX.Units = 'min'; % TODO Check Uniys
+                        myDatasets.Labels{1, 1}.AxisX.fo = '%0.2f';% TODO Check precision
+                        myDatasets.Labels{1, 1}.AxisY.Label = 'm/z';
+                        myDatasets.Labels{1, 1}.AxisY.Units = '';
+                        myDatasets.Labels{1, 1}.AxisY.fo = '%0.4f';
+                        myDatasets.Labels{1, 1}.AxisZ.Label = 'Intensity';
+                        myDatasets.Labels{1, 1}.AxisZ.Units = 'Arb. units';
+                        myDatasets.Labels{1, 1}.AxisZ.fo = '%0.0f';
+                        myDatasets.Options4Creations{1, 1} = options;
+                        myDatasets.PrimaryActions{1, 1} = 'Creation';
+                        myDatasets.SecondaryActions{1, 1} = {};
 
-                    mkdir(fullfile(obj.Path2Fin, myDatasets.Name{1, 1}));
-                    mkdir(fullfile(obj.Path2Fin, myDatasets.Name{1, 1}, 'Scans'));
-                    mzInterval = [inf 0];
-                    newProfiles = [];
+                        mkdir(fullfile(obj.Path2Fin, myDatasets.Name{1, 1}));
+                        mkdir(fullfile(obj.Path2Fin, myDatasets.Name{1, 1}, 'Scans'));
+                        mzInterval = [inf 0];
+                        newProfiles = [];
 
-                    ScanNumber = 0;
-                    vector = [0 0];
-                    vq = [];
-
-                    for ii = 1:numel(MasterTm)
-                        if any(Profiles.Scan_Time == MasterTm(ii))
-                            IdM = find(Profiles.Scan_Time == MasterTm(ii));
-                            ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
-                                'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdM, 1)), '.dat']);
-                            fidRead = fopen(ScanName, 'rb');
-                            cMS = fread(fidRead, ...
-                                [Profiles.Length_MS_Scan_Profile(IdM) Profiles.Column_MS_Scan_Profile(IdM)],...
-                                "double");
-                            fclose(fidRead);
-                            vq =  interp1(cMS(:,1), cMS(:,2), MasterMz);
-                            vq(~isfinite(vq)) = 0;
-                            myMS = [MasterMz, vq];
-                            vector = IdM;
-
-                        else
-                            vq_old = vq;
-
-                            IdS = find(Profiles.Scan_Time < MasterTm(ii), 1, 'last');
-                            IdE = find(Profiles.Scan_Time > MasterTm(ii), 1, 'first');
-                            if isempty(IdS), IdS = IdE; IdE = IdE+1; end
-                            if isempty(IdE), IdE = IdS; IdS = IdS-1; end
-
-                            if any(vector == IdS)
-                                try
-                                    vq = vq_old(:, vector == IdS);
-                                catch
-                                    disp("pp")
-                                end
-                            else
+                        ScanNumber = 0;
+                        vector = [0 0];
+                        vq = [];
+                        for ii = 1:numel(MasterTm)
+                            if any(Profiles.Scan_Time == MasterTm(ii))
+                                IdM = find(Profiles.Scan_Time == MasterTm(ii));
                                 ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
-                                    'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdS, 1)), '.dat']);
+                                    'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdM, 1)), '.dat']);
                                 fidRead = fopen(ScanName, 'rb');
                                 cMS = fread(fidRead, ...
-                                    [Profiles.Length_MS_Scan_Profile(IdS) Profiles.Column_MS_Scan_Profile(IdS)],...
+                                    [Profiles.Length_MS_Scan_Profile(IdM) Profiles.Column_MS_Scan_Profile(IdM)],...
                                     "double");
                                 fclose(fidRead);
                                 vq =  interp1(cMS(:,1), cMS(:,2), MasterMz);
+                                vq(~isfinite(vq)) = 0;
+                                myMS = [MasterMz, vq];
+                                vector = IdM;
+
+                            else
+                                vq_old = vq;
+
+                                IdS = find(Profiles.Scan_Time < MasterTm(ii), 1, 'last');
+                                IdE = find(Profiles.Scan_Time > MasterTm(ii), 1, 'first');
+                                if isempty(IdS), IdS = IdE; IdE = IdE+1; end
+                                if isempty(IdE), IdE = IdS; IdS = IdS-1; end
+
+                                if any(vector == IdS)
+                                    try
+                                        vq = vq_old(:, vector == IdS);
+                                    catch
+                                        disp("pp")
+                                    end
+                                else
+                                    ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
+                                        'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdS, 1)), '.dat']);
+                                    fidRead = fopen(ScanName, 'rb');
+                                    cMS = fread(fidRead, ...
+                                        [Profiles.Length_MS_Scan_Profile(IdS) Profiles.Column_MS_Scan_Profile(IdS)],...
+                                        "double");
+                                    fclose(fidRead);
+                                    vq =  interp1(cMS(:,1), cMS(:,2), MasterMz);
+                                end
+
+                                if  any(vector == IdE)
+                                    vq(:,2) = vq_old(:, vector == IdE);
+                                else
+                                    ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
+                                        'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdE, 1)), '.dat']);
+                                    fidRead = fopen(ScanName, 'rb');
+                                    cMS = fread(fidRead, ...
+                                        [Profiles.Length_MS_Scan_Profile(IdE) Profiles.Column_MS_Scan_Profile(IdE)],...
+                                        "double");
+                                    fclose(fidRead);
+                                    vq(:,2) =  interp1(cMS(:,1), cMS(:,2), MasterMz);
+                                end
+
+                                vq(~isfinite(vq)) = 0;
+                                vq2D = interp1(Profiles.Scan_Time(IdS:IdE), vq', MasterTm(ii));
+                                vq2D(~isfinite(vq2D)) = 0;
+                                myMS = [MasterMz, vq2D'];
+                                vector = [IdS IdE];
                             end
 
-                            if  any(vector == IdE)
-                                vq(:,2) = vq_old(:, vector == IdE);
+                            % Filter spikes if needed
+                            if options.RemSpks
+                                spkSz = options.SpkSz;
+                                myMS    = spikesRemoval(myMS, spkSz );
+                            end
+
+                            % reduced trailing zero in excess
+                            if ~isempty(myMS)
+                                provMat      = [myMS(2:end, 2); 0];
+                                provMat(:,2) = myMS(:, 2);
+                                provMat(:,3) = [0; myMS(1:end-1, 2)];
+                                myMS         = myMS(sum(provMat, 2) > 0, :);
+                            end
+
+                            if isempty(myMS)
+                                newProfiles(ScanNumber+1, :) = [ScanNumber, ...
+                                    MasterTm(ii), ...
+                                    nan, 0, sum(myMS(:,2)), 0, ...
+                                    nnz(myMS(:,2)), size(myMS), nan];
+
                             else
-                                ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
-                                    'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdE, 1)), '.dat']);
+
+                                M = ChrMoment(myMS, 2);
+                                newProfiles(ScanNumber+1, :) = [ScanNumber, ...
+                                    MasterTm(ii), ...
+                                    nan, max(myMS(:,2)), sum(myMS(:,2)), ...
+                                    min(myMS(myMS(:, 2) ~= 0, 2)), nnz(myMS(:,2)), ...
+                                    size(myMS), M(2)];
+
+                            end
+
+                            fileName = fullfile(obj.Path2Fin, 'Dataset1', 'Scans', ['Scan#', ...
+                                num2str(ScanNumber), '.dat']);
+                            [fidWriteDat, errmsg]  = fopen(fileName, 'wb');
+                            fwrite(fidWriteDat, myMS(:), "double");
+                            fclose(fidWriteDat);
+                            ScanNumber = ScanNumber + 1;
+                        end
+
+                        % Middle files
+                        for jj = 2:numel(obj.FinneesIn)-1
+
+                            load(fullfile(obj.FinneesIn{jj}, 'myFinnee.mat'), 'myFinnee');
+                            fObj = myFinnee;
+
+                            Id2Dataset = find(strcmp(['Dataset', num2str(targetDataset)], fObj.Datasets.Name));
+                            infoDataset = load(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'infoDataset.mat'));
+                            infoDataset = infoDataset.infoDataset;
+
+                            fidRead = fopen(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'Profiles.dat'), 'rb');
+                            Profiles = fread(fidRead, [infoDataset.Profiles.size], "double");
+                            fclose(fidRead);
+                            Profiles = array2table(Profiles);
+                            ColumnNames = {}; ColumnUnits = {};
+                            for ii = 1:numel(infoDataset.Profiles.column)
+                                ColumnNames{ii} = infoDataset.Profiles.column{ii}.name;
+                                ColumnUnits{ii} = infoDataset.Profiles.column{ii}.units;
+                            end
+                            Profiles.Properties.VariableNames = ColumnNames;
+                            Profiles.Properties.VariableUnits = ColumnUnits;
+                            if ~isempty(options.Alignment)
+                                Profiles.Scan_Time = Profiles.Scan_Time +...
+                                    polyval(options.Alignment{jj}{1}, Profiles.Scan_Time, options.Alignment{jj}{2}, options.Alignment{jj}{3});
+
+                            end
+
+                            fidRead = fopen(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'Spectra.dat'), 'rb');
+                            Spectra = fread(fidRead, [infoDataset.Spectra.size], "double");
+                            fclose(fidRead);
+                            Spectra = array2table(Spectra);
+                            ColumnNames = {}; ColumnUnits = {};
+                            for ii = 1:numel(infoDataset.Spectra.column)
+                                ColumnNames{ii} = infoDataset.Spectra.column{ii}.name;
+                                ColumnUnits{ii} = infoDataset.Spectra.column{ii}.units;
+                            end
+                            Spectra.Properties.VariableNames = ColumnNames;
+                            Spectra.Properties.VariableUnits = ColumnUnits;
+
+                            vector = [0 0];
+                            vq = [];
+                            for ii = 1:numel(MasterTm)
+                                vq_old = vq;
+                                % Open old MS
+                                ScanName = fullfile(obj.Path2Fin, 'Dataset1',...
+                                    'Scans', ['Scan#', num2str(newProfiles(ii, 1)), '.dat']);
                                 fidRead = fopen(ScanName, 'rb');
                                 cMS = fread(fidRead, ...
-                                    [Profiles.Length_MS_Scan_Profile(IdE) Profiles.Column_MS_Scan_Profile(IdE)],...
+                                    [newProfiles(ii, 8) newProfiles(ii, 9)],...
                                     "double");
                                 fclose(fidRead);
-                                vq(:,2) =  interp1(cMS(:,1), cMS(:,2), MasterMz);
+
+                                if ~isempty(cMS)
+                                    vq =  interp1(cMS(:,1), cMS(:,2), MasterMz);
+                                    vq(~isfinite(vq)) = 0;
+                                    oldMS = [MasterMz, vq];
+
+                                else
+                                    oldMS = MasterMz; oldMS(:, 2) = 0;
+
+                                end
+
+                                if any(Profiles.Scan_Time == MasterTm(ii))
+                                    IdM = find(Profiles.Scan_Time == MasterTm(ii));
+                                    ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
+                                        'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdM, 1)), '.dat']);
+                                    fidRead = fopen(ScanName, 'rb');
+                                    cMS = fread(fidRead, ...
+                                        [Profiles.Length_MS_Scan_Profile(IdM) Profiles.Column_MS_Scan_Profile(IdM)],...
+                                        "double");
+                                    fclose(fidRead);
+                                    vq =  interp1(cMS(:,1), cMS(:,2), MasterMz);
+                                    vq(~isfinite(vq)) = 0;
+                                    myMS = [MasterMz, vq];
+                                    vector = IdM;
+
+                                else
+
+                                    IdS = find(Profiles.Scan_Time < MasterTm(ii), 1, 'last');
+                                    IdE = find(Profiles.Scan_Time > MasterTm(ii), 1, 'first');
+                                    if isempty(IdS), IdS = IdE; IdE = IdE+1; end
+                                    if isempty(IdE), IdE = IdS; IdS = IdS-1; end
+
+                                    if any(vector == IdS)
+                                        vq = vq_old(:, vector == IdS);
+                                    else
+                                        ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
+                                            'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdS, 1)), '.dat']);
+                                        fidRead = fopen(ScanName, 'rb');
+                                        cMS = fread(fidRead, ...
+                                            [Profiles.Length_MS_Scan_Profile(IdS) Profiles.Column_MS_Scan_Profile(IdS)],...
+                                            "double");
+                                        fclose(fidRead);
+                                        vq =  interp1(cMS(:,1), cMS(:,2), MasterMz);
+                                    end
+
+                                    if  any(vector == IdE)
+                                        vq(:,2) = vq_old(:, vector == IdE);
+
+                                    else
+                                        ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
+                                            'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdE, 1)), '.dat']);
+                                        fidRead = fopen(ScanName, 'rb');
+                                        cMS = fread(fidRead, ...
+                                            [Profiles.Length_MS_Scan_Profile(IdE) Profiles.Column_MS_Scan_Profile(IdE)],...
+                                            "double");
+                                        fclose(fidRead);
+                                        vq(:,2) =  interp1(cMS(:,1), cMS(:,2), MasterMz);
+                                    end
+
+                                    vq(~isfinite(vq)) = 0;
+
+                                    vq2D = interp1(Profiles.Scan_Time(IdS:IdE), vq', MasterTm(ii));
+                                    vq2D(~isfinite(vq2D)) = 0;
+
+                                    myMS = [MasterMz, vq2D'];
+
+                                    vector = [IdS IdE];
+                                end
+                                myMS(:, 2) = myMS(:, 2) +  oldMS(:, 2);
+
+                                % Filter spikes if needed
+                                if options.RemSpks
+                                    spkSz = options.SpkSz;
+                                    myMS    = spikesRemoval(myMS, spkSz );
+                                end
+
+                                % reduced trailing zero in excess
+                                if ~isempty(myMS)
+                                    provMat      = [myMS(2:end, 2); 0];
+                                    provMat(:,2) = myMS(:, 2);
+                                    provMat(:,3) = [0; myMS(1:end-1, 2)];
+                                    myMS         = myMS(sum(provMat, 2) > 0, :);
+                                end
+
+                                if isempty(myMS)
+                                    newProfiles(ii, :) = [ii-1, MasterTm(ii), ...
+                                        nan, 0, sum(myMS(:,2)), 0, ...
+                                        nnz(myMS(:,2)), size(myMS), nan];
+
+                                else
+
+                                    M = ChrMoment(myMS, 2);
+                                    newProfiles(ii, :) = [ii-1, MasterTm(ii), ...
+                                        nan, max(myMS(:,2)), sum(myMS(:,2)), ...
+                                        min(myMS(myMS(:, 2) ~= 0, 2)), ...
+                                        nnz(myMS(:,2)), size(myMS), M(2)];
+
+                                end
+
+                                fileName = fullfile(obj.Path2Fin, 'Dataset1', 'Scans', ['Scan#', ...
+                                    num2str(ii-1), '.dat']);
+                                [fidWriteDat, errmsg]  = fopen(fileName, 'wb');
+                                fwrite(fidWriteDat, myMS(:), "double");
+                                fclose(fidWriteDat);
                             end
 
-                            vq(~isfinite(vq)) = 0;
-                            vq2D = interp1(Profiles.Scan_Time(IdS:IdE), vq', MasterTm(ii));
-                            vq2D(~isfinite(vq2D)) = 0;
-                            myMS = [MasterMz, vq2D'];
-                            vector = [IdS IdE];
                         end
 
-                        % Filter spikes if needed
-                        if options.RemSpks
-                            spkSz = options.SpkSz;
-                            myMS    = spikesRemoval(myMS, spkSz );
-                        end
+                        % last files
 
-                        % reduced trailing zero in excess
-                        if ~isempty(myMS)
-                            provMat      = [myMS(2:end, 2); 0];
-                            provMat(:,2) = myMS(:, 2);
-                            provMat(:,3) = [0; myMS(1:end-1, 2)];
-                            myMS         = myMS(sum(provMat, 2) > 0, :);
-                        end
-
-                        if isempty(myMS)
-                            newProfiles(ScanNumber+1, :) = [ScanNumber, ...
-                                MasterTm(ii), ...
-                                nan, 0, sum(myMS(:,2)), 0, ...
-                                nnz(myMS(:,2)), size(myMS), nan];
-
-                        else
-
-                            M = ChrMoment(myMS, 2);
-                            newProfiles(ScanNumber+1, :) = [ScanNumber, ...
-                                MasterTm(ii), ...
-                                nan, max(myMS(:,2)), sum(myMS(:,2)), ...
-                                min(myMS(myMS(:, 2) ~= 0, 2)), nnz(myMS(:,2)), ...
-                                size(myMS), M(2)];
-
-                        end
-
-                        fileName = fullfile(obj.Path2Fin, 'Dataset1', 'Scans', ['Scan#', ...
-                            num2str(ScanNumber), '.dat']);
-                        [fidWriteDat, errmsg]  = fopen(fileName, 'wb');
-                        fwrite(fidWriteDat, myMS(:), "double");
-                        fclose(fidWriteDat);
-                        ScanNumber = ScanNumber + 1;
-                    end
-
-                    % Middle files
-                    for jj = 2:numel(obj.FinneesIn)-1
-
-                        load(fullfile(obj.FinneesIn{jj}, 'myFinnee.mat'), 'myFinnee');
+                        load(fullfile(obj.FinneesIn{end}, 'myFinnee.mat'), 'myFinnee');
                         fObj = myFinnee;
 
                         Id2Dataset = find(strcmp(['Dataset', num2str(targetDataset)], fObj.Datasets.Name));
@@ -443,7 +603,7 @@ classdef Finnee
                         Profiles.Properties.VariableUnits = ColumnUnits;
                         if ~isempty(options.Alignment)
                             Profiles.Scan_Time = Profiles.Scan_Time +...
-                                polyval(options.Alignment{jj}{1}, Profiles.Scan_Time, options.Alignment{jj}{2}, options.Alignment{jj}{3});
+                                polyval(options.Alignment{end}{1}, Profiles.Scan_Time, options.Alignment{end}{2}, options.Alignment{end}{3});
 
                         end
 
@@ -459,6 +619,8 @@ classdef Finnee
                         Spectra.Properties.VariableNames = ColumnNames;
                         Spectra.Properties.VariableUnits = ColumnUnits;
 
+                        CurSeq = zeros(numel(MasterMz), 2);
+                        NewSpectra = MasterMz; NewSpectra(:, 7) = 0;
                         vector = [0 0];
                         vq = [];
                         for ii = 1:numel(MasterTm)
@@ -494,6 +656,7 @@ classdef Finnee
                                 vq =  interp1(cMS(:,1), cMS(:,2), MasterMz);
                                 vq(~isfinite(vq)) = 0;
                                 myMS = [MasterMz, vq];
+
                                 vector = IdM;
 
                             else
@@ -503,8 +666,9 @@ classdef Finnee
                                 if isempty(IdS), IdS = IdE; IdE = IdE+1; end
                                 if isempty(IdE), IdE = IdS; IdS = IdS-1; end
 
-                                if any(vector == IdS)
+                                if any(vector == IdS) & size(vector, 2) == size(vq_old, 1)
                                     vq = vq_old(:, vector == IdS);
+
                                 else
                                     ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
                                         'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdS, 1)), '.dat']);
@@ -518,7 +682,6 @@ classdef Finnee
 
                                 if  any(vector == IdE)
                                     vq(:,2) = vq_old(:, vector == IdE);
-
                                 else
                                     ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
                                         'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdE, 1)), '.dat']);
@@ -531,21 +694,34 @@ classdef Finnee
                                 end
 
                                 vq(~isfinite(vq)) = 0;
-
                                 vq2D = interp1(Profiles.Scan_Time(IdS:IdE), vq', MasterTm(ii));
                                 vq2D(~isfinite(vq2D)) = 0;
-
                                 myMS = [MasterMz, vq2D'];
-
-                                vector = [IdS IdE];
                             end
-                            myMS(:, 2) = myMS(:, 2) +  oldMS(:, 2);
+                            myMS(:, 2) = (myMS(:, 2) +  oldMS(:, 2))/numel(obj.FinneesIn);
 
                             % Filter spikes if needed
                             if options.RemSpks
                                 spkSz = options.SpkSz;
                                 myMS    = spikesRemoval(myMS, spkSz );
                             end
+
+                            %Record MZSpectra
+                            IdNnz = myMS(:, 2) > 0;
+                            NewSpectra(:,2) = NewSpectra(:,2) + double(IdNnz);
+                            IdStart = CurSeq(:, 2) == 0 & IdNnz;
+                            CurSeq(IdStart, 1) = ScanNumber+1;
+                            CurSeq(IdNnz, 2) = CurSeq(IdNnz, 2) + 1;
+
+                            % Check Length
+                            % newSpectra(~IdNnz,3) = max(newSpectra(~IdNnz,3), CurSeq(~IdNnz, 2));
+                            IdMatch = NewSpectra(:,3) < CurSeq(:, 2) & ~IdNnz;
+                            NewSpectra(IdMatch, 3) = CurSeq(IdMatch, 2);
+                            NewSpectra(IdMatch, 4) = CurSeq(IdMatch, 1);
+                            CurSeq(~IdNnz, 2) = 0;
+                            NewSpectra(:,5) = NewSpectra(:,5) + myMS(:, 2);
+                            NewSpectra(:,6) = max([NewSpectra(:,6), myMS(:, 2)], [], 2);
+                            %
 
                             % reduced trailing zero in excess
                             if ~isempty(myMS)
@@ -555,16 +731,20 @@ classdef Finnee
                                 myMS         = myMS(sum(provMat, 2) > 0, :);
                             end
 
-                            if isempty(myMS)
-                                newProfiles(ii, :) = [ii-1, MasterTm(ii), ...
-                                    nan, 0, sum(myMS(:,2)), 0, ...
-                                    nnz(myMS(:,2)), size(myMS), nan];
 
+                            if min(myMS(:,1)) < mzInterval(1), mzInterval(1) = min(myMS(:,1)); end
+                            if max(myMS(:,1)) > mzInterval(2), mzInterval(2) = max(myMS(:,1)); end
+
+                            if isempty(myMS)| size(myMS, 1) == 1 | sum(myMS(:, 2)) == 0
+                                newProfiles(ii, 1:10) = [ii-1,...
+                                    MasterTm(ii), nan, sum(myMS(:,2)), 0, ...
+                                    nnz(myMS(:,2)), size(myMS), NaN];
                             else
 
                                 M = ChrMoment(myMS, 2);
-                                newProfiles(ii, :) = [ii-1, MasterTm(ii), ...
-                                    nan, max(myMS(:,2)), sum(myMS(:,2)), ...
+                                newProfiles(ii, 1:10) = [ii-1, ...
+                                    MasterTm(ii), ...
+                                    nan,  max(myMS(:, 2)), sum(myMS(:, 2)),...
                                     min(myMS(myMS(:, 2) ~= 0, 2)), ...
                                     nnz(myMS(:,2)), size(myMS), M(2)];
 
@@ -575,339 +755,461 @@ classdef Finnee
                             [fidWriteDat, errmsg]  = fopen(fileName, 'wb');
                             fwrite(fidWriteDat, myMS(:), "double");
                             fclose(fidWriteDat);
-                        end
 
-                    end
-
-                    % last files
-
-                    load(fullfile(obj.FinneesIn{end}, 'myFinnee.mat'), 'myFinnee');
-                    fObj = myFinnee;
-
-                    Id2Dataset = find(strcmp(['Dataset', num2str(targetDataset)], fObj.Datasets.Name));
-                    infoDataset = load(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'infoDataset.mat'));
-                    infoDataset = infoDataset.infoDataset;
-
-                    fidRead = fopen(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'Profiles.dat'), 'rb');
-                    Profiles = fread(fidRead, [infoDataset.Profiles.size], "double");
-                    fclose(fidRead);
-                    Profiles = array2table(Profiles);
-                    ColumnNames = {}; ColumnUnits = {};
-                    for ii = 1:numel(infoDataset.Profiles.column)
-                        ColumnNames{ii} = infoDataset.Profiles.column{ii}.name;
-                        ColumnUnits{ii} = infoDataset.Profiles.column{ii}.units;
-                    end
-                    Profiles.Properties.VariableNames = ColumnNames;
-                    Profiles.Properties.VariableUnits = ColumnUnits;
-                    if ~isempty(options.Alignment)
-                        Profiles.Scan_Time = Profiles.Scan_Time +...
-                            polyval(options.Alignment{end}{1}, Profiles.Scan_Time, options.Alignment{end}{2}, options.Alignment{end}{3});
-
-                    end
-
-                    fidRead = fopen(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'Spectra.dat'), 'rb');
-                    Spectra = fread(fidRead, [infoDataset.Spectra.size], "double");
-                    fclose(fidRead);
-                    Spectra = array2table(Spectra);
-                    ColumnNames = {}; ColumnUnits = {};
-                    for ii = 1:numel(infoDataset.Spectra.column)
-                        ColumnNames{ii} = infoDataset.Spectra.column{ii}.name;
-                        ColumnUnits{ii} = infoDataset.Spectra.column{ii}.units;
-                    end
-                    Spectra.Properties.VariableNames = ColumnNames;
-                    Spectra.Properties.VariableUnits = ColumnUnits;
-
-                    CurSeq = zeros(numel(MasterMz), 2);
-                    NewSpectra = MasterMz; NewSpectra(:, 7) = 0;
-                    vector = [0 0];
-                    vq = [];
-                    for ii = 1:numel(MasterTm)
-                        vq_old = vq;
-                        % Open old MS
-                        ScanName = fullfile(obj.Path2Fin, 'Dataset1',...
-                            'Scans', ['Scan#', num2str(newProfiles(ii, 1)), '.dat']);
-                        fidRead = fopen(ScanName, 'rb');
-                        cMS = fread(fidRead, ...
-                            [newProfiles(ii, 8) newProfiles(ii, 9)],...
-                            "double");
-                        fclose(fidRead);
-
-                        if ~isempty(cMS)
-                            vq =  interp1(cMS(:,1), cMS(:,2), MasterMz);
-                            vq(~isfinite(vq)) = 0;
-                            oldMS = [MasterMz, vq];
-
-                        else
-                            oldMS = MasterMz; oldMS(:, 2) = 0;
+                            vector = [IdS IdE];
 
                         end
 
-                        if any(Profiles.Scan_Time == MasterTm(ii))
-                            IdM = find(Profiles.Scan_Time == MasterTm(ii));
-                            ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
-                                'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdM, 1)), '.dat']);
-                            fidRead = fopen(ScanName, 'rb');
-                            cMS = fread(fidRead, ...
-                                [Profiles.Length_MS_Scan_Profile(IdM) Profiles.Column_MS_Scan_Profile(IdM)],...
-                                "double");
-                            fclose(fidRead);
-                            vq =  interp1(cMS(:,1), cMS(:,2), MasterMz);
-                            vq(~isfinite(vq)) = 0;
-                            myMS = [MasterMz, vq];
-
-                            vector = IdM;
-
-                        else
-
-                            IdS = find(Profiles.Scan_Time < MasterTm(ii), 1, 'last');
-                            IdE = find(Profiles.Scan_Time > MasterTm(ii), 1, 'first');
-                            if isempty(IdS), IdS = IdE; IdE = IdE+1; end
-                            if isempty(IdE), IdE = IdS; IdS = IdS-1; end
-
-                            if any(vector == IdS) & size(vector, 2) == size(vq_old, 1)
-                                vq = vq_old(:, vector == IdS);
-
-                            else
-                                ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
-                                    'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdS, 1)), '.dat']);
-                                fidRead = fopen(ScanName, 'rb');
-                                cMS = fread(fidRead, ...
-                                    [Profiles.Length_MS_Scan_Profile(IdS) Profiles.Column_MS_Scan_Profile(IdS)],...
-                                    "double");
-                                fclose(fidRead);
-                                vq =  interp1(cMS(:,1), cMS(:,2), MasterMz);
-                            end
-
-                            if  any(vector == IdE)
-                                vq(:,2) = vq_old(:, vector == IdE);
-                            else
-                                ScanName = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)],...
-                                    'Scans', ['Scan#', num2str(Profiles.Scan_Index(IdE, 1)), '.dat']);
-                                fidRead = fopen(ScanName, 'rb');
-                                cMS = fread(fidRead, ...
-                                    [Profiles.Length_MS_Scan_Profile(IdE) Profiles.Column_MS_Scan_Profile(IdE)],...
-                                    "double");
-                                fclose(fidRead);
-                                vq(:,2) =  interp1(cMS(:,1), cMS(:,2), MasterMz);
-                            end
-
-                            vq(~isfinite(vq)) = 0;
-                            vq2D = interp1(Profiles.Scan_Time(IdS:IdE), vq', MasterTm(ii));
-                            vq2D(~isfinite(vq2D)) = 0;
-                            myMS = [MasterMz, vq2D'];
-                        end
-                        myMS(:, 2) = (myMS(:, 2) +  oldMS(:, 2))/numel(obj.FinneesIn);
-
-                        % Filter spikes if needed
-                        if options.RemSpks
-                            spkSz = options.SpkSz;
-                            myMS    = spikesRemoval(myMS, spkSz );
-                        end
-
-                        %Record MZSpectra
-                        IdNnz = myMS(:, 2) > 0;
-                        NewSpectra(:,2) = NewSpectra(:,2) + double(IdNnz);
-                        IdStart = CurSeq(:, 2) == 0 & IdNnz;
-                        CurSeq(IdStart, 1) = ScanNumber+1;
-                        CurSeq(IdNnz, 2) = CurSeq(IdNnz, 2) + 1;
-
-                        % Check Length
-                        % newSpectra(~IdNnz,3) = max(newSpectra(~IdNnz,3), CurSeq(~IdNnz, 2));
-                        IdMatch = NewSpectra(:,3) < CurSeq(:, 2) & ~IdNnz;
+                        IdMatch = NewSpectra(:,3) < CurSeq(:, 2);
                         NewSpectra(IdMatch, 3) = CurSeq(IdMatch, 2);
                         NewSpectra(IdMatch, 4) = CurSeq(IdMatch, 1);
-                        CurSeq(~IdNnz, 2) = 0;
-                        NewSpectra(:,5) = NewSpectra(:,5) + myMS(:, 2);
-                        NewSpectra(:,6) = max([NewSpectra(:,6), myMS(:, 2)], [], 2);
-                        %
+                        NewSpectra(:,7) = NewSpectra(:,5)./NewSpectra(:,2);
 
-                        % reduced trailing zero in excess
-                        if ~isempty(myMS)
-                            provMat      = [myMS(2:end, 2); 0];
-                            provMat(:,2) = myMS(:, 2);
-                            provMat(:,3) = [0; myMS(1:end-1, 2)];
-                            myMS         = myMS(sum(provMat, 2) > 0, :);
-                        end
+                        provMat = [NewSpectra(2:end, 4); 0];
+                        provMat(:,2) = NewSpectra(:, 4);
+                        provMat(:,3) = [0; NewSpectra(1:end-1, 2)];
+                        NewSpectra = NewSpectra(sum(provMat, 2) > 0, :);
+                        short_mzAxis =  NewSpectra(:,1);
 
+                        % Find mz lines with only spikes
+                        IdSpikes = ~isnan(NewSpectra(:, 6)) ...
+                            & NewSpectra(:, 3) <= options.Spk4noise;
+                        if sum(IdSpikes) < options.MinMinNoise(1)
+                            minNoise = options.MinMinNoise(2);
+                            DoNoise = false;
 
-                        if min(myMS(:,1)) < mzInterval(1), mzInterval(1) = min(myMS(:,1)); end
-                        if max(myMS(:,1)) > mzInterval(2), mzInterval(2) = max(myMS(:,1)); end
-
-                        if isempty(myMS)| size(myMS, 1) == 1 | sum(myMS(:, 2)) == 0
-                            newProfiles(ii, 1:10) = [ii-1,...
-                                MasterTm(ii), nan, sum(myMS(:,2)), 0, ...
-                                nnz(myMS(:,2)), size(myMS), NaN];
                         else
-
-                            M = ChrMoment(myMS, 2);
-                            newProfiles(ii, 1:10) = [ii-1, ...
-                                MasterTm(ii), ...
-                                nan,  max(myMS(:, 2)), sum(myMS(:, 2)),...
-                                min(myMS(myMS(:, 2) ~= 0, 2)), ...
-                                nnz(myMS(:,2)), size(myMS), M(2)];
+                            DoNoise = true;
 
                         end
 
-                        fileName = fullfile(obj.Path2Fin, 'Dataset1', 'Scans', ['Scan#', ...
-                            num2str(ii-1), '.dat']);
-                        [fidWriteDat, errmsg]  = fopen(fileName, 'wb');
-                        fwrite(fidWriteDat, myMS(:), "double");
-                        fclose(fidWriteDat);
+                        ScNu = 0;
+                        CurSeq = zeros(numel(short_mzAxis), 2);
+                        NoiseVector = [];
 
-                        vector = [IdS IdE];
+                        for ii = 1:numel(newProfiles(:,1))
+                            ScanName = fullfile(obj.Path2Fin, 'Dataset1',...
+                                'Scans', ['Scan#', num2str(newProfiles(ii,1)), '.dat']);
+                            fidRead = fopen(ScanName, 'rb');
+                            myMS = fread(fidRead, ...
+                                [newProfiles(ii, 8) newProfiles(ii, 9)],...
+                                "double");
+                            fclose(fidRead);
 
-                    end
+                            if isempty(myMS)
+                                cMZ = short_mzAxis; cMZ(:, 2) = 0;
 
-                    IdMatch = NewSpectra(:,3) < CurSeq(:, 2);
-                    NewSpectra(IdMatch, 3) = CurSeq(IdMatch, 2);
-                    NewSpectra(IdMatch, 4) = CurSeq(IdMatch, 1);
-                    NewSpectra(:,7) = NewSpectra(:,5)./NewSpectra(:,2);
+                            else
+                                [~, IdI] = intersect(short_mzAxis, myMS(:,1));
+                                cMZ = short_mzAxis; cMZ(IdI, 2) = myMS(:,2);
+                            end
 
-                    provMat = [NewSpectra(2:end, 4); 0];
-                    provMat(:,2) = NewSpectra(:, 4);
-                    provMat(:,3) = [0; NewSpectra(1:end-1, 2)];
-                    NewSpectra = NewSpectra(sum(provMat, 2) > 0, :);
-                    short_mzAxis =  NewSpectra(:,1);
+                            % Record Noise
+                            NoiseVector = [NoiseVector; cMZ(IdSpikes & cMZ(:, 2) > 0, 2)];
 
-                    % Find mz lines with only spikes
-                    IdSpikes = ~isnan(NewSpectra(:, 6)) ...
-                        & NewSpectra(:, 3) <= options.Spk4noise;
-                    if sum(IdSpikes) < options.MinMinNoise(1)
-                        minNoise = options.MinMinNoise(2);
-                        DoNoise = false;
+                        end
+                        NoiseVector(isoutlier(NoiseVector)) = [];
+                        NoiseVector(isoutlier(NoiseVector)) = [];
+                        minNoise = round(mean(NoiseVector) + 2*std(NoiseVector));
+
+                        obj.Options = options;
+                        % 3- Save and done
+
+                        infoDataset.dateofcreation = datetime("now");
+                        infoDataset.AdditionalInformation.nonEndingErrors{1} = '';
+                        infoDataset.AdditionalInformation.ComputingTime = toc(tStart);
+                        infoDataset.Label = myDatasets.Labels{1};
+                        infoDataset.mzInterval =  mzInterval;
+                        infoDataset.minNoise =  nan;
+                        infoDataset.Options = obj.Options;
+                        infoDataset.Profiles.size = size(newProfiles);
+                        infoDataset.Profiles.column{1}.name = 'Scan_Index';
+                        infoDataset.Profiles.column{1}.labelUnits = '#';
+                        infoDataset.Profiles.column{1}.units = '';
+                        infoDataset.Profiles.column{1}.formatUnits = '%0.0f';
+                        infoDataset.Profiles.column{1}.ShowMe = false;
+                        infoDataset.Profiles.column{2}.name = 'Scan_Time';
+                        infoDataset.Profiles.column{2}.labelUnits = myDatasets.Labels{1}.AxisX.Label;
+                        infoDataset.Profiles.column{2}.units = myDatasets.Labels{1}.AxisX.Units;
+                        infoDataset.Profiles.column{2}.formatUnits = myDatasets.Labels{1}.AxisX.fo;
+                        infoDataset.Profiles.column{2}.ShowMe = false;
+                        infoDataset.Profiles.column{3}.name = 'Injection_Time';
+                        infoDataset.Profiles.column{3}.labelUnits = 'Time';
+                        infoDataset.Profiles.column{3}.units = '';
+                        infoDataset.Profiles.column{3}.formatUnits = myDatasets.Labels{1}.AxisX.fo;
+                        infoDataset.Profiles.column{3}.ShowMe = true;
+                        infoDataset.Profiles.column{4}.name = 'Base_Peak_Profile';
+                        infoDataset.Profiles.column{4}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Profiles.column{4}.units = myDatasets.Labels{1}.AxisZ.Units;
+                        infoDataset.Profiles.column{4}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Profiles.column{4}.ShowMe = true;
+                        infoDataset.Profiles.column{5}.name = 'Total_Ions_Profile';
+                        infoDataset.Profiles.column{5}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Profiles.column{5}.units = myDatasets.Labels{1}.AxisZ.Units;
+                        infoDataset.Profiles.column{5}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Profiles.column{5}.ShowMe = true;
+                        infoDataset.Profiles.column{6}.name = 'Lowest_Intensity_Profile';
+                        infoDataset.Profiles.column{6}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Profiles.column{6}.units = myDatasets.Labels{1}.AxisZ.Units;
+                        infoDataset.Profiles.column{6}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Profiles.column{6}.ShowMe = false;
+                        infoDataset.Profiles.column{7}.name = 'Non_Null_Elements_Profile';
+                        infoDataset.Profiles.column{7}.labelUnits = '';
+                        infoDataset.Profiles.column{7}.units = '';
+                        infoDataset.Profiles.column{7}.formatUnits = '%0.0f';
+                        infoDataset.Profiles.column{7}.ShowMe = false;
+                        infoDataset.Profiles.column{8}.name = 'Length_MS_Scan_Profile';
+                        infoDataset.Profiles.column{8}.labelUnits = '';
+                        infoDataset.Profiles.column{8}.units = '';
+                        infoDataset.Profiles.column{8}.formatUnits = '%0.0f';
+                        infoDataset.Profiles.column{8}.ShowMe = false;
+                        infoDataset.Profiles.column{9}.name = 'Column_MS_Scan_Profile';
+                        infoDataset.Profiles.column{9}.labelUnits = '';
+                        infoDataset.Profiles.column{9}.units = '';
+                        infoDataset.Profiles.column{9}.formatUnits = '%0.0f';
+                        infoDataset.Profiles.column{9}.ShowMe = false;
+                        infoDataset.Profiles.column{10}.name = 'MS_centroid_profile';
+                        infoDataset.Profiles.column{10}.labelUnits = myDatasets.Labels{1}.AxisY.fo;
+                        infoDataset.Profiles.column{10}.units = myDatasets.Labels{1}.AxisY.Units;
+                        infoDataset.Profiles.column{10}.formatUnits = myDatasets.Labels{1}.AxisY.fo;
+                        infoDataset.Profiles.column{10}.ShowMe = true
+
+                        infoDataset.Spectra.size = size(NewSpectra);
+                        infoDataset.Spectra.column{1}.name = 'm/z axis';
+                        infoDataset.Spectra.column{1}.labelUnits = myDatasets.Labels{1}.AxisY.Label;
+                        infoDataset.Spectra.column{1}.units = '';
+                        infoDataset.Spectra.column{1}.formatUnits = myDatasets.Labels{1}.AxisY.fo;
+                        infoDataset.Spectra.column{1}.ShowMe = false;
+                        infoDataset.Spectra.column{2}.name = 'Non_Zeros_Elements';
+                        infoDataset.Spectra.column{2}.labelUnits = '';
+                        infoDataset.Spectra.column{2}.units = '';
+                        infoDataset.Spectra.column{2}.formatUnits = '%0.0f';
+                        infoDataset.Spectra.column{2}.ShowMe = false;
+                        infoDataset.Spectra.column{3}.name = 'Max_Continuous_Profile';
+                        infoDataset.Spectra.column{3}.labelUnits = '';
+                        infoDataset.Spectra.column{3}.units = '';
+                        infoDataset.Spectra.column{3}.formatUnits = '%0.0f';
+                        infoDataset.Spectra.column{3}.ShowMe = false;
+                        infoDataset.Spectra.column{4}.name = 'Id_Start_for_Max_Continuous_Profile';
+                        infoDataset.Spectra.column{4}.labelUnits = '';
+                        infoDataset.Spectra.column{4}.units = '';
+                        infoDataset.Spectra.column{4}.formatUnits = '%0.0f';
+                        infoDataset.Spectra.column{4}.ShowMe = false;
+                        infoDataset.Spectra.column{5}.name = 'Total_Intensity_Spectrum';
+                        infoDataset.Spectra.column{5}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Spectra.column{5}.units =  myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Spectra.column{5}.formatUnits =  myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Spectra.column{5}.ShowMe = true;
+                        infoDataset.Spectra.column{6}.name = 'Base_Intensity_Spectrum';
+                        infoDataset.Spectra.column{6}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Spectra.column{6}.units = myDatasets.Labels{1}.AxisZ.Units;
+                        infoDataset.Spectra.column{6}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Spectra.column{6}.ShowMe = true;
+                        infoDataset.Spectra.column{7}.name = 'Average_Intensity';
+                        infoDataset.Spectra.column{7}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Spectra.column{7}.units = myDatasets.Labels{1}.AxisZ.Units;
+                        infoDataset.Spectra.column{7}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Spectra.column{7}.ShowMe = true;
 
                     else
-                        DoNoise = true;
+                        %% IF ALL AXIS ARE IDENTICAL IN ALL FILES!
+                       % 1. Do the first object
+                        load(fullfile(obj.FinneesIn{1}, 'myFinnee.mat'), 'myFinnee');
+                        fObj = myFinnee;
+                        Id2Dataset = find(strcmp(['Dataset', num2str(targetDataset)], fObj.Datasets.Name));
+                        infoDataset = load(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'infoDataset.mat'));
+                        infoDataset = infoDataset.infoDataset;
+                        myDatasets.Name{1, 1} = 'Dataset1';
+                        myDatasets.CreationCode{1, 1} = '';
+                        myDatasets.IsMS1{1, 1} = true;
+                        myDatasets.isProfileScan{1, 1} = true;
+                        myDatasets.HasMasterMZ(1, 1) = true;
+                        myDatasets.isBaseDriftCorr{1, 1} = false;
+                        myDatasets.HasNoiseRem{1, 1} = false;
+                        myDatasets.IsDaugherOff{1, 1} = '';
+                        myDatasets.Labels{1, 1}.AxisX.Label = 'Time';
+                        myDatasets.Labels{1, 1}.AxisX.Units = 'min'; % TODO Check Uniys
+                        myDatasets.Labels{1, 1}.AxisX.fo = '%0.2f';% TODO Check precision
+                        myDatasets.Labels{1, 1}.AxisY.Label = 'm/z';
+                        myDatasets.Labels{1, 1}.AxisY.Units = '';
+                        myDatasets.Labels{1, 1}.AxisY.fo = '%0.4f';
+                        myDatasets.Labels{1, 1}.AxisZ.Label = 'Intensity';
+                        myDatasets.Labels{1, 1}.AxisZ.Units = 'Arb. units';
+                        myDatasets.Labels{1, 1}.AxisZ.fo = '%0.0f';
+                        myDatasets.Options4Creations{1, 1} = options;
+                        myDatasets.PrimaryActions{1, 1} = 'Creation';
+                        myDatasets.SecondaryActions{1, 1} = {};
 
-                    end
+                        mkdir(fullfile(obj.Path2Fin, myDatasets.Name{1, 1}));
+                        mkdir(fullfile(obj.Path2Fin, myDatasets.Name{1, 1}, 'Scans'));
+                        mzInterval = [inf 0];
+                        newProfiles = [];
 
-                    ScNu = 0;
-                    CurSeq = zeros(numel(short_mzAxis), 2);
-                    NoiseVector = [];
+                        ScanNumber = 0;
+                        MasterMz = fObj.Datasets.Options4Creations{2,1}.Axis.mzAxis;
+                        tmAxis = fObj.Datasets.Options4Creations{2,1}.Axis.TimeAxis;
+                        ScanID.indice = nan(numel(tmAxis), numel(obj.FinneesIn));
+                        ScanID.height = nan(numel(tmAxis), numel(obj.FinneesIn));
+                        ScanID.column = nan(numel(tmAxis), numel(obj.FinneesIn));
+                        Path4Scan = {};
 
-                    for ii = 1:numel(newProfiles(:,1))
-                        ScanName = fullfile(obj.Path2Fin, 'Dataset1',...
-                            'Scans', ['Scan#', num2str(newProfiles(ii,1)), '.dat']);
-                        fidRead = fopen(ScanName, 'rb');
-                        myMS = fread(fidRead, ...
-                            [newProfiles(ii, 8) newProfiles(ii, 9)],...
-                            "double");
-                        fclose(fidRead);
+                        for iScan = 1:numel(obj.FinneesIn)
+                            load(fullfile(obj.FinneesIn{iScan}, 'myFinnee.mat'), 'myFinnee');
+                            fObj = myFinnee;
+                            Id2Dataset = find(strcmp(['Dataset', num2str(targetDataset)], fObj.Datasets.Name));
+                            infoDataset = load(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'infoDataset.mat'));
+                            infoDataset = infoDataset.infoDataset;
 
-                        if isempty(myMS)
-                            cMZ = short_mzAxis; cMZ(:, 2) = 0;
+                            fidRead = fopen(fullfile(fObj.Path2Fin, fObj.Datasets.Name{Id2Dataset}, 'Profiles.dat'), 'rb');
+                            Pfs = fread(fidRead, [infoDataset.Profiles.size], "double");
+                            Path4Scan{iScan} = fullfile(fObj.Path2Fin, ['Dataset', num2str(Id2Dataset)], 'Scans');
+                            [~, ia, ib] = intersect(Pfs(:, 2), tmAxis);
 
-                        else
-                            [~, IdI] = intersect(short_mzAxis, myMS(:,1));
-                            cMZ = short_mzAxis; cMZ(IdI, 2) = myMS(:,2);
+                            if numel(ib) ~= height(Pfs)
+                                disp("pp")
+                            end
+
+                            ScanID.indice(ib, iScan) = Pfs(ia, 1);
+                            ScanID.height(ib, iScan) = Pfs(ia, 8);
+                            ScanID.column(ib, iScan) = Pfs(ia, 9);
+
                         end
 
-                        % Record Noise
-                        NoiseVector = [NoiseVector; cMZ(IdSpikes & cMZ(:, 2) > 0, 2)];
+                        CurSeq = zeros(numel(MasterMz), 2);
+                        NewSpectra = MasterMz; NewSpectra(:, 7) = 0;
+                        
+                        for ii = 1:height(ScanID.indice)
+                            IdX = find(~isnan(ScanID.indice(ii, :)));
+                            if isempty(IdX), continue; end
 
+                            myMS = MasterMz; myMS(:, 2) = 0;
+
+                            for jj = 1:numel(IdX)
+                                IdDts = IdX(jj);
+                                IdScan = ScanID.indice(ii, IdDts);
+                                mySize = [ScanID.height(ii, IdDts) ScanID.column(ii, IdDts)];
+                                ScanName = fullfile(Path4Scan{IdDts}, ['Scan#', num2str(IdScan), '.dat']);
+                                fidRead = fopen(ScanName, 'rb');
+                                cMS = fread(fidRead,  mySize, "double");
+                                fclose(fidRead);
+                                [~, ~, ib] = intersect(cMS(:, 1), myMS(:, 1));
+
+                                myMS(ib, 2) = myMS(ib, 2) +  cMS(:, 2);
+
+                            end
+                            myMS(:, 2) = myMS(:, 2)/numel(IdX);
+
+                            % Filter spikes if needed
+                            if options.RemSpks
+                                spkSz   = options.SpkSz;
+                                myMS    = spikesRemoval(myMS, spkSz );
+                            end
+
+                            %Record MZSpectra
+                            IdNnz = myMS(:, 2) > 0;
+                            NewSpectra(:,2) = NewSpectra(:,2) + double(IdNnz);
+                            IdStart = CurSeq(:, 2) == 0 & IdNnz;
+                            CurSeq(IdStart, 1) = ScanNumber+1;
+                            CurSeq(IdNnz, 2) = CurSeq(IdNnz, 2) + 1;
+
+                            % Check Length
+                            IdMatch = NewSpectra(:,3) < CurSeq(:, 2) & ~IdNnz;
+                            NewSpectra(IdMatch, 3) = CurSeq(IdMatch, 2);
+                            NewSpectra(IdMatch, 4) = CurSeq(IdMatch, 1);
+                            CurSeq(~IdNnz, 2) = 0;
+                            NewSpectra(:,5) = NewSpectra(:,5) + myMS(:, 2);
+                            NewSpectra(:,6) = max([NewSpectra(:,6), myMS(:, 2)], [], 2);
+                            %
+
+                            % reduced trailing zero in excess
+                            if ~isempty(myMS)
+                                provMat      = [myMS(2:end, 2); 0];
+                                provMat(:,2) = myMS(:, 2);
+                                provMat(:,3) = [0; myMS(1:end-1, 2)];
+                                myMS         = myMS(sum(provMat, 2) > 0, :);
+                            end
+
+
+                            if min(myMS(:,1)) < mzInterval(1), mzInterval(1) = min(myMS(:,1)); end
+                            if max(myMS(:,1)) > mzInterval(2), mzInterval(2) = max(myMS(:,1)); end
+
+                            if isempty(myMS)| size(myMS, 1) == 1 | sum(myMS(:, 2)) == 0
+                                newProfiles(ScanNumber+1, 1:10) = [ScanNumber, ...
+                                    tmAxis(ii), ...
+                                    nan,  max(myMS(:, 2)), sum(myMS(:, 2)),...
+                                    min(myMS(myMS(:, 2) ~= 0, 2)), ...
+                                    nnz(myMS(:,2)), size(myMS), nan];
+                            else
+
+                                M = ChrMoment(myMS, 2);
+                                newProfiles(ScanNumber+1, 1:10) = [ScanNumber, ...
+                                    tmAxis(ii), ...
+                                    nan,  max(myMS(:, 2)), sum(myMS(:, 2)),...
+                                    min(myMS(myMS(:, 2) ~= 0, 2)), ...
+                                    nnz(myMS(:,2)), size(myMS), M(2)];
+
+                            end
+
+                            fileName = fullfile(obj.Path2Fin, 'Dataset1', 'Scans', ['Scan#', ...
+                                num2str(ScanNumber), '.dat']);
+                            [fidWriteDat, errmsg]  = fopen(fileName, 'wb');
+                            fwrite(fidWriteDat, myMS(:), "double");
+                            fclose(fidWriteDat);
+                            ScanNumber = ScanNumber + 1;
+
+                        end
+
+                        IdMatch = NewSpectra(:,3) < CurSeq(:, 2);
+                        NewSpectra(IdMatch, 3) = CurSeq(IdMatch, 2);
+                        NewSpectra(IdMatch, 4) = CurSeq(IdMatch, 1);
+                        NewSpectra(:,7) = NewSpectra(:,5)./NewSpectra(:,2);
+
+                        provMat = [NewSpectra(2:end, 4); 0];
+                        provMat(:,2) = NewSpectra(:, 4);
+                        provMat(:,3) = [0; NewSpectra(1:end-1, 2)];
+                        NewSpectra = NewSpectra(sum(provMat, 2) > 0, :);
+                        short_mzAxis =  NewSpectra(:,1);
+
+                        % Find mz lines with only spikes
+                        IdSpikes = ~isnan(NewSpectra(:, 6)) ...
+                            & NewSpectra(:, 3) <= options.Spk4noise;
+                        if sum(IdSpikes) < options.MinMinNoise(1)
+                            minNoise = options.MinMinNoise(2);
+                            DoNoise = false;
+
+                        else
+                            DoNoise = true;
+
+                        end
+
+                        ScNu = 0;
+                        CurSeq = zeros(numel(short_mzAxis), 2);
+                        NoiseVector = [];
+
+                        for ii = 1:numel(newProfiles(:,1))
+                            ScanName = fullfile(obj.Path2Fin, 'Dataset1',...
+                                'Scans', ['Scan#', num2str(newProfiles(ii,1)), '.dat']);
+                            fidRead = fopen(ScanName, 'rb');
+                            myMS = fread(fidRead, ...
+                                [newProfiles(ii, 8) newProfiles(ii, 9)],...
+                                "double");
+                            fclose(fidRead);
+
+                            if isempty(myMS)
+                                cMZ = short_mzAxis; cMZ(:, 2) = 0;
+
+                            else
+                                [~, IdI] = intersect(short_mzAxis, myMS(:,1));
+                                cMZ = short_mzAxis; cMZ(IdI, 2) = myMS(:,2);
+                            end
+
+                            % Record Noise
+                            NoiseVector = [NoiseVector; cMZ(IdSpikes & cMZ(:, 2) > 0, 2)];
+
+                        end
+                        NoiseVector(isoutlier(NoiseVector)) = [];
+                        NoiseVector(isoutlier(NoiseVector)) = [];
+                        minNoise = round(mean(NoiseVector) + 2*std(NoiseVector));
+
+                        obj.Options = options;
+                        % 3- Save and done
+
+                        infoDataset.dateofcreation = datetime("now");
+                        infoDataset.AdditionalInformation.nonEndingErrors{1} = '';
+                        infoDataset.AdditionalInformation.ComputingTime = toc(tStart);
+                        infoDataset.Label = myDatasets.Labels{1};
+                        infoDataset.mzInterval =  mzInterval;
+                        infoDataset.minNoise =  nan;
+                        infoDataset.Options = obj.Options;
+                        infoDataset.Profiles.size = size(newProfiles);
+                        infoDataset.Profiles.column{1}.name = 'Scan_Index';
+                        infoDataset.Profiles.column{1}.labelUnits = '#';
+                        infoDataset.Profiles.column{1}.units = '';
+                        infoDataset.Profiles.column{1}.formatUnits = '%0.0f';
+                        infoDataset.Profiles.column{1}.ShowMe = false;
+                        infoDataset.Profiles.column{2}.name = 'Scan_Time';
+                        infoDataset.Profiles.column{2}.labelUnits = myDatasets.Labels{1}.AxisX.Label;
+                        infoDataset.Profiles.column{2}.units = myDatasets.Labels{1}.AxisX.Units;
+                        infoDataset.Profiles.column{2}.formatUnits = myDatasets.Labels{1}.AxisX.fo;
+                        infoDataset.Profiles.column{2}.ShowMe = false;
+                        infoDataset.Profiles.column{3}.name = 'Injection_Time';
+                        infoDataset.Profiles.column{3}.labelUnits = 'Time';
+                        infoDataset.Profiles.column{3}.units = '';
+                        infoDataset.Profiles.column{3}.formatUnits = myDatasets.Labels{1}.AxisX.fo;
+                        infoDataset.Profiles.column{3}.ShowMe = true;
+                        infoDataset.Profiles.column{4}.name = 'Base_Peak_Profile';
+                        infoDataset.Profiles.column{4}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Profiles.column{4}.units = myDatasets.Labels{1}.AxisZ.Units;
+                        infoDataset.Profiles.column{4}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Profiles.column{4}.ShowMe = true;
+                        infoDataset.Profiles.column{5}.name = 'Total_Ions_Profile';
+                        infoDataset.Profiles.column{5}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Profiles.column{5}.units = myDatasets.Labels{1}.AxisZ.Units;
+                        infoDataset.Profiles.column{5}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Profiles.column{5}.ShowMe = true;
+                        infoDataset.Profiles.column{6}.name = 'Lowest_Intensity_Profile';
+                        infoDataset.Profiles.column{6}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Profiles.column{6}.units = myDatasets.Labels{1}.AxisZ.Units;
+                        infoDataset.Profiles.column{6}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Profiles.column{6}.ShowMe = false;
+                        infoDataset.Profiles.column{7}.name = 'Non_Null_Elements_Profile';
+                        infoDataset.Profiles.column{7}.labelUnits = '';
+                        infoDataset.Profiles.column{7}.units = '';
+                        infoDataset.Profiles.column{7}.formatUnits = '%0.0f';
+                        infoDataset.Profiles.column{7}.ShowMe = false;
+                        infoDataset.Profiles.column{8}.name = 'Length_MS_Scan_Profile';
+                        infoDataset.Profiles.column{8}.labelUnits = '';
+                        infoDataset.Profiles.column{8}.units = '';
+                        infoDataset.Profiles.column{8}.formatUnits = '%0.0f';
+                        infoDataset.Profiles.column{8}.ShowMe = false;
+                        infoDataset.Profiles.column{9}.name = 'Column_MS_Scan_Profile';
+                        infoDataset.Profiles.column{9}.labelUnits = '';
+                        infoDataset.Profiles.column{9}.units = '';
+                        infoDataset.Profiles.column{9}.formatUnits = '%0.0f';
+                        infoDataset.Profiles.column{9}.ShowMe = false;
+                        infoDataset.Profiles.column{10}.name = 'MS_centroid_profile';
+                        infoDataset.Profiles.column{10}.labelUnits = myDatasets.Labels{1}.AxisY.fo;
+                        infoDataset.Profiles.column{10}.units = myDatasets.Labels{1}.AxisY.Units;
+                        infoDataset.Profiles.column{10}.formatUnits = myDatasets.Labels{1}.AxisY.fo;
+                        infoDataset.Profiles.column{10}.ShowMe = true
+
+                        infoDataset.Spectra.size = size(NewSpectra);
+                        infoDataset.Spectra.column{1}.name = 'm/z axis';
+                        infoDataset.Spectra.column{1}.labelUnits = myDatasets.Labels{1}.AxisY.Label;
+                        infoDataset.Spectra.column{1}.units = '';
+                        infoDataset.Spectra.column{1}.formatUnits = myDatasets.Labels{1}.AxisY.fo;
+                        infoDataset.Spectra.column{1}.ShowMe = false;
+                        infoDataset.Spectra.column{2}.name = 'Non_Zeros_Elements';
+                        infoDataset.Spectra.column{2}.labelUnits = '';
+                        infoDataset.Spectra.column{2}.units = '';
+                        infoDataset.Spectra.column{2}.formatUnits = '%0.0f';
+                        infoDataset.Spectra.column{2}.ShowMe = false;
+                        infoDataset.Spectra.column{3}.name = 'Max_Continuous_Profile';
+                        infoDataset.Spectra.column{3}.labelUnits = '';
+                        infoDataset.Spectra.column{3}.units = '';
+                        infoDataset.Spectra.column{3}.formatUnits = '%0.0f';
+                        infoDataset.Spectra.column{3}.ShowMe = false;
+                        infoDataset.Spectra.column{4}.name = 'Id_Start_for_Max_Continuous_Profile';
+                        infoDataset.Spectra.column{4}.labelUnits = '';
+                        infoDataset.Spectra.column{4}.units = '';
+                        infoDataset.Spectra.column{4}.formatUnits = '%0.0f';
+                        infoDataset.Spectra.column{4}.ShowMe = false;
+                        infoDataset.Spectra.column{5}.name = 'Total_Intensity_Spectrum';
+                        infoDataset.Spectra.column{5}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Spectra.column{5}.units =  myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Spectra.column{5}.formatUnits =  myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Spectra.column{5}.ShowMe = true;
+                        infoDataset.Spectra.column{6}.name = 'Base_Intensity_Spectrum';
+                        infoDataset.Spectra.column{6}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Spectra.column{6}.units = myDatasets.Labels{1}.AxisZ.Units;
+                        infoDataset.Spectra.column{6}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Spectra.column{6}.ShowMe = true;
+                        infoDataset.Spectra.column{7}.name = 'Average_Intensity';
+                        infoDataset.Spectra.column{7}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
+                        infoDataset.Spectra.column{7}.units = myDatasets.Labels{1}.AxisZ.Units;
+                        infoDataset.Spectra.column{7}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
+                        infoDataset.Spectra.column{7}.ShowMe = true;
                     end
-                    NoiseVector(isoutlier(NoiseVector)) = [];
-                    NoiseVector(isoutlier(NoiseVector)) = [];
-                    minNoise = round(mean(NoiseVector) + 2*std(NoiseVector));
-
-                    obj.Options = options;
-                    % 3- Save and done
-
-                    infoDataset.dateofcreation = datetime("now");
-                    infoDataset.AdditionalInformation.nonEndingErrors{1} = '';
-                    infoDataset.AdditionalInformation.ComputingTime = toc(tStart);
-                    infoDataset.Label = myDatasets.Labels{1};
-                    infoDataset.mzInterval =  mzInterval;
-                    infoDataset.minNoise =  nan;
-                    infoDataset.Options = obj.Options;
-                    infoDataset.Profiles.size = size(newProfiles);
-                    infoDataset.Profiles.column{1}.name = 'Scan_Index';
-                    infoDataset.Profiles.column{1}.labelUnits = '#';
-                    infoDataset.Profiles.column{1}.units = '';
-                    infoDataset.Profiles.column{1}.formatUnits = '%0.0f';
-                    infoDataset.Profiles.column{1}.ShowMe = false;
-                    infoDataset.Profiles.column{2}.name = 'Scan_Time';
-                    infoDataset.Profiles.column{2}.labelUnits = myDatasets.Labels{1}.AxisX.Label;
-                    infoDataset.Profiles.column{2}.units = myDatasets.Labels{1}.AxisX.Units;
-                    infoDataset.Profiles.column{2}.formatUnits = myDatasets.Labels{1}.AxisX.fo;
-                    infoDataset.Profiles.column{2}.ShowMe = false;
-                    infoDataset.Profiles.column{3}.name = 'Injection_Time';
-                    infoDataset.Profiles.column{3}.labelUnits = 'Time';
-                    infoDataset.Profiles.column{3}.units = '';
-                    infoDataset.Profiles.column{3}.formatUnits = myDatasets.Labels{1}.AxisX.fo;
-                    infoDataset.Profiles.column{3}.ShowMe = true;
-                    infoDataset.Profiles.column{4}.name = 'Base_Peak_Profile';
-                    infoDataset.Profiles.column{4}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
-                    infoDataset.Profiles.column{4}.units = myDatasets.Labels{1}.AxisZ.Units;
-                    infoDataset.Profiles.column{4}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
-                    infoDataset.Profiles.column{4}.ShowMe = true;
-                    infoDataset.Profiles.column{5}.name = 'Total_Ions_Profile';
-                    infoDataset.Profiles.column{5}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
-                    infoDataset.Profiles.column{5}.units = myDatasets.Labels{1}.AxisZ.Units;
-                    infoDataset.Profiles.column{5}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
-                    infoDataset.Profiles.column{5}.ShowMe = true;
-                    infoDataset.Profiles.column{6}.name = 'Lowest_Intensity_Profile';
-                    infoDataset.Profiles.column{6}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
-                    infoDataset.Profiles.column{6}.units = myDatasets.Labels{1}.AxisZ.Units;
-                    infoDataset.Profiles.column{6}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
-                    infoDataset.Profiles.column{6}.ShowMe = false;
-                    infoDataset.Profiles.column{7}.name = 'Non_Null_Elements_Profile';
-                    infoDataset.Profiles.column{7}.labelUnits = '';
-                    infoDataset.Profiles.column{7}.units = '';
-                    infoDataset.Profiles.column{7}.formatUnits = '%0.0f';
-                    infoDataset.Profiles.column{7}.ShowMe = false;
-                    infoDataset.Profiles.column{8}.name = 'Length_MS_Scan_Profile';
-                    infoDataset.Profiles.column{8}.labelUnits = '';
-                    infoDataset.Profiles.column{8}.units = '';
-                    infoDataset.Profiles.column{8}.formatUnits = '%0.0f';
-                    infoDataset.Profiles.column{8}.ShowMe = false;
-                    infoDataset.Profiles.column{9}.name = 'Column_MS_Scan_Profile';
-                    infoDataset.Profiles.column{9}.labelUnits = '';
-                    infoDataset.Profiles.column{9}.units = '';
-                    infoDataset.Profiles.column{9}.formatUnits = '%0.0f';
-                    infoDataset.Profiles.column{9}.ShowMe = false;
-                    infoDataset.Profiles.column{10}.name = 'MS_centroid_profile';
-                    infoDataset.Profiles.column{10}.labelUnits = myDatasets.Labels{1}.AxisY.fo;
-                    infoDataset.Profiles.column{10}.units = myDatasets.Labels{1}.AxisY.Units;
-                    infoDataset.Profiles.column{10}.formatUnits = myDatasets.Labels{1}.AxisY.fo;
-                    infoDataset.Profiles.column{10}.ShowMe = true
-                    
-                    infoDataset.Spectra.size = size(NewSpectra);
-                    infoDataset.Spectra.column{1}.name = 'm/z axis';
-                    infoDataset.Spectra.column{1}.labelUnits = myDatasets.Labels{1}.AxisY.Label;
-                    infoDataset.Spectra.column{1}.units = '';
-                    infoDataset.Spectra.column{1}.formatUnits = myDatasets.Labels{1}.AxisY.fo;
-                    infoDataset.Spectra.column{1}.ShowMe = false;
-                    infoDataset.Spectra.column{2}.name = 'Non_Zeros_Elements';
-                    infoDataset.Spectra.column{2}.labelUnits = '';
-                    infoDataset.Spectra.column{2}.units = '';
-                    infoDataset.Spectra.column{2}.formatUnits = '%0.0f';
-                    infoDataset.Spectra.column{2}.ShowMe = false;
-                    infoDataset.Spectra.column{3}.name = 'Max_Continuous_Profile';
-                    infoDataset.Spectra.column{3}.labelUnits = '';
-                    infoDataset.Spectra.column{3}.units = '';
-                    infoDataset.Spectra.column{3}.formatUnits = '%0.0f';
-                    infoDataset.Spectra.column{3}.ShowMe = false;
-                    infoDataset.Spectra.column{4}.name = 'Id_Start_for_Max_Continuous_Profile';
-                    infoDataset.Spectra.column{4}.labelUnits = '';
-                    infoDataset.Spectra.column{4}.units = '';
-                    infoDataset.Spectra.column{4}.formatUnits = '%0.0f';
-                    infoDataset.Spectra.column{4}.ShowMe = false;
-                    infoDataset.Spectra.column{5}.name = 'Total_Intensity_Spectrum';
-                    infoDataset.Spectra.column{5}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
-                    infoDataset.Spectra.column{5}.units =  myDatasets.Labels{1}.AxisZ.Label;
-                    infoDataset.Spectra.column{5}.formatUnits =  myDatasets.Labels{1}.AxisZ.fo;
-                    infoDataset.Spectra.column{5}.ShowMe = true;
-                    infoDataset.Spectra.column{6}.name = 'Base_Intensity_Spectrum';
-                    infoDataset.Spectra.column{6}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
-                    infoDataset.Spectra.column{6}.units = myDatasets.Labels{1}.AxisZ.Units;
-                    infoDataset.Spectra.column{6}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
-                    infoDataset.Spectra.column{6}.ShowMe = true;
-                    infoDataset.Spectra.column{7}.name = 'Average_Intensity';
-                    infoDataset.Spectra.column{7}.labelUnits = myDatasets.Labels{1}.AxisZ.Label;
-                    infoDataset.Spectra.column{7}.units = myDatasets.Labels{1}.AxisZ.Units;
-                    infoDataset.Spectra.column{7}.formatUnits = myDatasets.Labels{1}.AxisZ.fo;
-                    infoDataset.Spectra.column{7}.ShowMe = true;
 
 
                     save(fullfile(obj.Path2Fin, 'Dataset1', 'infoDataset.mat'), 'infoDataset');
@@ -1055,6 +1357,7 @@ classdef Finnee
                 options.Sig2Nois        = 3;
                 options.MinMinNoise     = [100, 10];
                 options.getDerivatives  = true;
+                options.InterpolateAxis = false;
 
                 options.Precisions.Time = '%0.2f';
                 options.Precisions.Intensity = '%0.0f';
@@ -1063,6 +1366,11 @@ classdef Finnee
 
                 % 2- Decipher varargin and update options when relevamt
                 input = @(x) find(strcmpi(varargin,x),1);
+
+                tgtIx = input('doInterpolate');
+                if ~isempty(tgtIx)
+                    options.InterpolateAxis = varargin{tgtIx +1};
+                end
 
                 tgtIx = input('TgtDatasets');
                 if ~isempty(tgtIx)
@@ -1773,7 +2081,7 @@ classdef Finnee
             [fidReadDat, errmsg]  = fopen(fileName, 'rb');
             XY = fread(fidReadDat, inf, "double");
             fclose(fidReadDat);
-            XY(:,2) = 0;
+            XY(:, 3) = 0;
 
             for ii = IdS:IdE
                 ScanName = fullfile(obj.Path2Fin, ['Dataset', num2str(dts)],...
@@ -1785,10 +2093,10 @@ classdef Finnee
                 fclose(fidRead);
                 [~, IdX] = intersect(XY(:,1), myMS(:,1));
                 XY(IdX, 2) = XY(IdX, 2) + myMS(:,2);
-
             end
 
             XY(XY(:,1) < mzInt(1) | XY(:,1) > mzInt(2), :) = [];
+            XY(:, 3) = XY(:, 2)/(IdE-IdS);
 
             % reduced trailing zero in excess
             if ~isempty(XY)
@@ -1888,7 +2196,7 @@ classdef Finnee
             ItE = find(Profiles.Scan_Time >= TmLim(2), 1, 'first');
             if isempty(ItE), ItE = numel(Profiles.Scan_Time); end
 
-            XY2 = zeros(ItE-ItS+1, 3);
+            XY2 = zeros(ItE-ItS+1, 4);
 
             ImS = findCloser(MzLim(1), Spectra.("m/z axis"));
             if isempty(ImS), ImS = 1; end
@@ -1897,19 +2205,33 @@ classdef Finnee
             for ii = ItS:ItE
                 ScanName = fullfile(obj.Path2Fin, ['Dataset', num2str(dts)],...
                     'Scans', ['Scan#', num2str(Profiles.Scan_Index(ii, 1)), '.dat']);
+                
                 fidRead = fopen(ScanName, 'rb');
-                myMS = fread(fidRead, ...
-                    [Profiles.Length_MS_Scan_Profile(ii) Profiles.Column_MS_Scan_Profile(ii)],...
-                    "double");
-                fclose(fidRead);
+                if fidRead == -1
+                    myMS = [];
 
-                [~, Id2Keep] = intersect(myMS(:, 1), Spectra.("m/z axis")(ImS:ImE));
+                else
+                    myMS = fread(fidRead, ...
+                        [Profiles.Length_MS_Scan_Profile(ii) Profiles.Column_MS_Scan_Profile(ii)],...
+                        "double");
+                    fclose(fidRead);
+                end
+
+                if isempty(myMS)
+                    Id2Keep = [];
+
+                else
+                    [~, Id2Keep] = intersect(myMS(:, 1), Spectra.("m/z axis")(ImS:ImE));
+
+                end
 
                 if ~isempty(Id2Keep)
 
+                    M = ChrMoment(myMS(Id2Keep,:), 2);
                     XY2(ii-ItS+1, 1) = Profiles.Scan_Time(ii);
-                    XY2(ii-ItS+1, 2) = sum(myMS(Id2Keep,2));
+                    XY2(ii-ItS+1, 2) = M(1);
                     XY2(ii-ItS+1, 3) = max(myMS(Id2Keep,2));
+                    XY2(ii-ItS+1, 4) = M(2);
 
                 else
                     XY2(ii-ItS+1, 1) = Profiles.Scan_Time(ii);
