@@ -204,19 +204,19 @@ while 1
     
     cy = options.cycles;
     SG = options.smoothing(1);
-    Ga = options.spreading(1, :);
+    Ga = options.spreading(1);
 
     if cy == 0
         % [~,g] = sgolay(2, SG);
         % Data2 = filter2(g(:, 1)', cuMatrix, 'same');
-        Data2 = smoothdata2(cuMatrix, 'gaussian', {3, SG});
+        Data2 = smoothdata2(cuMatrix, 'gaussian', {1, SG});
 
     else
         [~,g] = sgolay(2, SG);
         Data2 = cuMatrix;
 
-        if Ga(2) ~= 0
-            Data2 = smoothdata2(Data2, 'gaussian', {Ga(1), Ga(2)});
+        if Ga ~= 0
+            Data2 = smoothdata2(Data2, 'gaussian', {1, Ga});
             Data2(isnan(Data2)) = 0;
 
         end
@@ -244,10 +244,11 @@ while 1
 
     for jj = 2:cy
         SG = options.smoothing(jj);
-        Ga = options.spreading(jj, :);
+        Ga = options.spreading(jj);
 
-        if Ga(2) > 0
-           Data2 = smoothdata2(Data2, 'gaussian', {Ga(1), Ga(2)});
+        if Ga > 0
+            %! TO BE CHANGED TO !1D filter and optimise for speed
+           Data2 = smoothdata2(Data2, 'gaussian', {1, Ga});
            Data2(isnan(Data2)) = 0;
 
         end
@@ -419,27 +420,39 @@ save(fullfile(obj.Path2Fin, 'myFinnee.mat'), 'myFinnee')
         % options.smoothing       = [11; 7; 5; 3; 3; 3];
         % options.spreading       = [0; 11; 7; 5; 3; 3];
         options.smoothing       = [3; 3; 3; 3; 3; 3; 3; 3];
-        options.spreading       = [1, 61; 1, 41; 1, 31; 1, 21; 1, 11; 1, 9; 1, 7; 1, 5];
+        options.spreading       = [61; 41; 31; 21; 11; 9; 7; 5];
 
         % options.smoothing       = [3; 3; 3; 3; 3; 3; 3; 3];
         % options.spreading       = [1, 91; 1, 51; 1, 43; 1, 35; 1, 27; 1, 19; 1, 11; 1, 3];
         options.cycles          = 8; 
         options.ParallelMe      = false;
         options.sizeMat         = 500;
-        options.FilterIons.do   = true;
+        options.FilterIons.do   = false;
         options.FilterIons.Dmz  = 50000;
         options.FilterIons.Ions  = [229.1428, 201.1125, 83.0603, 99.5309, ...
             129.0545, 158.9610, 90.5258, 111.0435, 246.1681, 88.0232, 125.9862, ...
             143.9970, 102.0336];
-% 
-%         % 3- Decipher varargin
-%         input = @(x) find(strcmpi(varargin,x),1);
-% 
-%         tgtIx = input('tLim');
-%         if ~isempty(tgtIx)
-%             tLim         = varargin{tgtIx +1};
-%             options.XLim = [min(tLim) max(tLim)];
-%         end
+
+        % 3- Decipher varargin
+        input = @(x) find(strcmpi(varargin,x),1);
+
+        tgtIx = input('cycles');
+        if ~isempty(tgtIx)
+            spreading         = varargin{tgtIx +1};
+            options.cycles    = length(spreading);
+            options.spreading = spreading;
+        end
+
+        tgtIx = input('Dmz');
+        if ~isempty(tgtIx)
+            options.FilterIons.Dmz = varargin{tgtIx +1};
+        end
+
+        tgtIx = input('ionsOut');
+        if ~isempty(tgtIx)
+            options.FilterIons.do = true;
+            options.FilterIons.Ions = varargin{tgtIx +1};
+        end
 % 
 %         tgtIx = input('spikes');
 %         if ~isempty(tgtIx)
